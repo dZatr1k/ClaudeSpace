@@ -1,0 +1,37 @@
+# Checks on every push/PR to main: typecheck, lint, agent tests (python + tmux), vitest, build. No e2e (needs a display).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: tmux for agent and integration tests
+        run: command -v tmux || (sudo apt-get update && sudo apt-get install -y tmux)
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:agent
+      - run: npm run test:unit
+      - run: npm run build

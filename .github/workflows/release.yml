@@ -1,0 +1,95 @@
+# Release: push a tag vX.Y.Z (scripts/release.mjs makes the commit and the tag) ->
+# tests on Linux, then the Windows NSIS installer is built and published to GitHub Releases with latest.yml,
+# which installed apps read for auto-update (electron-updater).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches package.json version and repository
+        run: |
+          v=$(node -p "require('./package.json').version")
+          if [ "v$v" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $v"; exit 1
+          fi
+          repo=$(node -p "require('./package.json').repository.url")
+          if [ "$repo" != "https://github.com/$GITHUB_REPOSITORY.git" ]; then
+            echo "::error::package.json repository ($repo) is not https://github.com/$GITHUB_REPOSITORY.git: the updater would look for releases elsewhere"; exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: tmux for agent and integration tests
+        run: command -v tmux || (sudo apt-get update && sudo apt-get install -y tmux)
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:agent
+      - run: npm run test:unit
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # create the release and upload the installer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # npm scripts call python3 (agent bundle); Windows Python only has python.exe
+      - name: python3 alias
+        shell: pwsh
+        run: |
+          $py = (Get-Command python).Source
+          Copy-Item $py (Join-Path (Split-Path $py) 'python3.exe')
+          python3 --version
+      - run: npm ci
+      # typecheck + agent bundle + electron-vite build
+      - run: npm run build
+      - name: Build and publish the installer
+        run: npx electron-builder --win --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # optional Linux build (AppImage updates itself too); after Windows so both upload to the same release
+  linux:
+    needs: windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run build
+      - name: Build and publish the AppImage
+        run: npx electron-builder --linux AppImage --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,20 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+*.log
+.vite/
+.eslintcache
+__pycache__/
+*.pyc
+# generated agent bundle (npm run agent:manifest)
+resources/agent/
+# test artifacts
+test-results/
+playwright-report/
+tests/e2e/.tmp/
+.DS_Store
+*.tsbuildinfo
+.env
+.env.*
