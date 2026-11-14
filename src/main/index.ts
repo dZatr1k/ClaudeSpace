@@ -24,6 +24,7 @@ import type { VmPort } from '../shared/protocol';
 import type { Transport } from './transport/types';
 import { Store } from './store';
 import { DataCache } from './snapshot';
+import { uploadImage } from './images';
 import { createWindow, installCsp, rendererEntry, setOverlayTheme } from './window';
 import { AppTray } from './tray';
 import { Updater } from './updater';
@@ -181,6 +182,17 @@ function effectiveDark(): boolean {
 /** the renderer's startup splash is up (window.ts: caption buttons match its background) */
 let splashOn = true;
 
+async function safeUpload(data: Uint8Array) {
+  try {
+    const r = await uploadImage(conn.transport, data);
+    log('[image]', r.ok ? `uploaded ${data.length} B -> ${r.path}` : `refused: ${r.error}`);
+    return r;
+  } catch (e) {
+    log('[image] upload failed:', (e as Error).message);
+    return { ok: false as const, error: (e as Error).message };
+  }
+}
+
 function applyTheme() {
   nativeTheme.themeSource = store.settings.appearance.theme;
   if (win) setOverlayTheme(win, effectiveDark(), splashOn);
@@ -294,6 +306,17 @@ const handlers: Handlers = {
   'sound.load': () => loadSound(store.settings.notifications.soundFile),
   'notify.show': (a) => showSystemNotification(a),
   'clipboard.read': () => clipboard.readText(),
+  'image.pasteClipboard': async () => {
+    // Electron 45 clipboard API (W3C-like): the first image/* entry, e.g. a Win+Shift+S screenshot (image/png)
+    for (const item of await clipboard.read()) {
+      const type = item.types.find((x) => x.startsWith('image/'));
+      if (!type) continue;
+      const blob = (await item.getType(type)) as Blob;
+      return safeUpload(new Uint8Array(await blob.arrayBuffer()));
+    }
+    return { ok: false as const, none: true as const };
+  },
+  'image.upload': ({ data }) => safeUpload(data),
   'launch.rdp': () => launchRdp(store.settings.integrations.rdpScript, { log }),
   'launch.vscode': ({ path }) => {
     const s = store.settings;

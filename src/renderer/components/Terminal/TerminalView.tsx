@@ -1,5 +1,6 @@
-import { CircleAlert, CircleCheck, CircleStop, LoaderCircle, Unplug, WifiOff } from 'lucide-react';
+import { CircleAlert, CircleCheck, CircleStop, ImagePlus, LoaderCircle, Unplug, WifiOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import type { DragEvent } from 'react';
 import type { Tab } from '@shared/model';
 import * as A from '../../actions';
 import { invoke } from '../../bridge';
@@ -8,6 +9,7 @@ import { t } from '../../i18n/ru';
 import { appShortcut, terminalKey } from '../../keymap';
 import { useConn } from '../../stores/conn';
 import { useData } from '../../stores/data';
+import { attachDroppedFiles } from '../../lib/images';
 import { useTabs } from '../../stores/tabs';
 import { useUi } from '../../stores/ui';
 import { Button } from '../ui/Button';
@@ -208,6 +210,8 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const settings = useUi((u) => u.settings);
   const online = useConn((c) => c.state.kind === 'online');
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0); // dragenter/leave fire for every child
 
   useEffect(() => {
     const h = createHandle(tab);
@@ -288,11 +292,35 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }) {
     { label: t.actions.find, hint: 'Ctrl+Shift+F', run: () => findInActive() },
   ];
   const dimmed = !online || tab.term === 'offline';
+  const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files');
   return (
     <div
       className={`absolute inset-0 ${active ? '' : 'invisible pointer-events-none'}`}
       data-terminal={tab.id}
       data-term-state={tab.term}
+      onDragEnter={(e) => {
+        if (!hasFiles(e) || dimmed) return;
+        dragDepth.current++;
+        setDragging(true);
+      }}
+      onDragOver={(e) => {
+        if (!hasFiles(e) || dimmed) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDragLeave={() => {
+        if (--dragDepth.current <= 0) {
+          dragDepth.current = 0;
+          setDragging(false);
+        }
+      }}
+      onDrop={(e) => {
+        dragDepth.current = 0;
+        setDragging(false);
+        if (!hasFiles(e) || dimmed) return;
+        e.preventDefault();
+        void attachDroppedFiles(tab.id, Array.from(e.dataTransfer.files));
+      }}
       onWheel={(e) => {
         if (e.ctrlKey) {
           e.preventDefault();
@@ -308,6 +336,16 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }) {
         />
       </ContextMenu>
       {active && <TermOverlay tab={tab} />}
+      {dragging && (
+        <div
+          className="pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-accent bg-base/80"
+          data-testid="image-drop"
+        >
+          <ImagePlus size={24} className="text-accent-text" aria-hidden />
+          <div className="text-[14px] font-semibold">{t.images.drop}</div>
+          <div className="text-[12px] text-muted">{t.images.dropHint}</div>
+        </div>
+      )}
       {settings && null}
     </div>
   );

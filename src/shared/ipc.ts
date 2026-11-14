@@ -67,6 +67,10 @@ export const ipcSchemas = {
     })
     .strict(),
   'clipboard.read': z.undefined(),
+  'image.pasteClipboard': z.undefined(),
+  'image.upload': z
+    .object({ data: z.instanceof(Uint8Array).refine((d) => d.length <= 20 * 1024 * 1024) })
+    .strict(),
   'launch.rdp': z.undefined(),
   'launch.vscode': z.object({ path: z.string().min(1).max(4096) }).strict(),
   'launch.openExternal': z.object({ url: z.string().url().max(4096) }).strict(),
@@ -157,6 +161,16 @@ export interface IpcContract {
     result: { ok: boolean };
   };
   'clipboard.read': { args: undefined; result: string };
+  /** upload the clipboard image to the VM; none = the clipboard holds no image */
+  'image.pasteClipboard': {
+    args: undefined;
+    result: { ok: true; path: string } | { ok: false; error: string } | { ok: false; none: true };
+  };
+  /** upload dropped image bytes to the VM */
+  'image.upload': {
+    args: { data: Uint8Array };
+    result: { ok: true; path: string } | { ok: false; error: string };
+  };
   'launch.rdp': { args: undefined; result: { ok: boolean; error?: string; notConfigured?: boolean } };
   'launch.vscode': { args: { path: string }; result: { ok: boolean; error?: string } };
   'launch.openExternal': { args: { url: string }; result: void };

@@ -25,6 +25,8 @@ export const IPC_CHANNEL_NAMES = [
   'sound.load',
   'notify.show',
   'clipboard.read',
+  'image.pasteClipboard',
+  'image.upload',
   'launch.rdp',
   'launch.vscode',
   'launch.openExternal',

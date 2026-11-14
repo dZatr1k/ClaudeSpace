@@ -40,6 +40,10 @@ function applyTheme() {
   }
 }
 
+// a file dropped outside a terminal must not make Chromium open it (terminals handle their own drops)
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => e.preventDefault());
+
 async function init() {
   const [settings, appInfo, ws, snap, conn, pcl] = await Promise.all([
     invoke('settings.get'),

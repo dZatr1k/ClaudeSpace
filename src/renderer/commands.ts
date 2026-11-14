@@ -1,5 +1,6 @@
 // One registry of app actions: the palette, menus and hotkeys take them from here.
 import { defaultSettings } from '@shared/settings';
+import { pasteClipboardImage } from './lib/images';
 import { invoke } from './bridge';
 import { t } from './i18n/ru';
 import { basename } from './lib/format';
@@ -58,7 +59,10 @@ export async function pasteToActive(): Promise<void> {
   const h = tab ? getHandle(tab.id) : undefined;
   if (!tab || !h) return;
   const text = await invoke('clipboard.read');
-  if (!text) return;
+  if (!text) {
+    await pasteClipboardImage(tab.id); // a screenshot etc.: upload to the VM, paste its path
+    return;
+  }
   const lines = text.split(/\r\n|\r|\n/).length;
   const warn = ui().settings?.terminal.warnMultilinePaste ?? true;
   if (warn && lines > 5) {

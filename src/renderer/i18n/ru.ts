@@ -130,6 +130,14 @@ export const ru = {
     focusSidebar: 'Фокус в сайдбар',
     devtools: 'Инструменты разработчика',
   },
+  images: {
+    drop: 'Отпустите, чтобы прикрепить картинку',
+    dropHint: 'Она загрузится на VM, а в чат вставится путь к ней',
+    uploading: 'Загружаю картинку на VM…',
+    notImage: 'Прикрепить можно только картинки PNG, JPEG, GIF и WebP',
+    tooBig: (name: string) => `${name} больше 20 МБ`,
+    failed: (e: string) => `Картинка не загрузилась: ${e}`,
+  },
   term: {
     connecting: (s: string) => `Подключаюсь к «${s}»…`,
     offline: 'Нет связи с VM',
