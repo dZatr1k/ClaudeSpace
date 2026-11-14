@@ -26,17 +26,18 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 if HERE not in sys.path:          # -I (isolated, safe-path) does not put the script dir on sys.path
     sys.path.insert(0, HERE)
 
-from cclib import (askpass, chats, doctor, netstat, paths, projects, search, sessions, system, tmux,  # noqa: E402
-                   turns, usage, winfs)
+from cclib import (askpass, chats, doctor, files, gitview, netstat, paths, projects, search, sessions, system,  # noqa: E402
+                   tmux, turns, usage, winfs)
 
-AGENT_VERSION = '0.1.0'
+AGENT_VERSION = '0.2.0'
 PROTOCOL = 1
 MAX_FRAME = 4 * 1024 * 1024
 POLL = {'sessions': 1.0, 'tmux': 2.0, 'chats': 3.0, 'projects': 30.0, 'system': 10.0, 'winfs': 5.0, 'ports': 3.0, 'askpass': 2.0}
 WINDOW_RE = re.compile(r'^[0-9]{1,4}$')
 SEARCH_ID_RE = re.compile(r'^[A-Za-z0-9_-]{1,32}$')
 SLOW = {'usage', 'doctor', 'system', 'project_preview', 'session_preview', 'mosh_list', 'mosh_kill_stale',
-        'create_project', 'winfs_mount', 'winfs_unmount', 'pc_tunnel_status', 'askpass_enable'}
+        'create_project', 'winfs_mount', 'winfs_unmount', 'pc_tunnel_status', 'askpass_enable',
+        'fs_list', 'fs_read', 'git_status', 'git_diff', 'git_log'}
 TUNNEL_PORT = 2222
 
 
@@ -171,6 +172,9 @@ class Agent:
             'list_ports': self.m_list_ports,
             'askpass_enable': self.m_askpass_enable, 'askpass_reply': self.m_askpass_reply,
             'search_chats': self.m_search_chats, 'search_cancel': self.m_search_cancel,
+            'fs_list': self.m_fs_list, 'fs_read': self.m_fs_read, 'fs_upload_target': self.m_fs_upload_target,
+            'fs_download_source': self.m_fs_download_source,
+            'git_status': self.m_git_status, 'git_diff': self.m_git_diff, 'git_log': self.m_git_log,
         }
 
     # -------------------------------------------------------------- output
@@ -726,6 +730,38 @@ class Agent:
     def m_search_cancel(self, p):
         sid = p_str(p, 'searchId', required=False, pattern=SEARCH_ID_RE)
         return {'cancelled': self.searcher.cancel(sid)}
+
+    # ---- Files and Git panels (stage 5): read-only, through the deny-list; uploads only get a validated target
+    @staticmethod
+    def _wrap(fn, *a, **kw):
+        try:
+            return fn(*a, **kw)
+        except (files.FilesError, gitview.GitError) as e:
+            raise AgentError(e.code, e.message)
+
+    def m_fs_list(self, p):
+        return self._wrap(files.list_dir, p_str(p, 'path'))
+
+    def m_fs_read(self, p):
+        return self._wrap(files.read_file, p_str(p, 'path'))
+
+    def m_fs_upload_target(self, p):
+        return self._wrap(files.upload_target, p_str(p, 'dir'), p_str(p, 'name', max_len=255))
+
+    def m_fs_download_source(self, p):
+        return self._wrap(files.download_source, p_str(p, 'path'))
+
+    def m_git_status(self, p):
+        return self._wrap(gitview.status, self._wrap(files.resolve, p_str(p, 'path'), 'dir'))
+
+    def m_git_diff(self, p):
+        d = self._wrap(files.resolve, p_str(p, 'path'), 'dir')
+        return self._wrap(gitview.diff, d, p_str(p, 'file'), p_bool(p, 'staged', False),
+                          p_bool(p, 'untracked', False))
+
+    def m_git_log(self, p):
+        d = self._wrap(files.resolve, p_str(p, 'path'), 'dir')
+        return self._wrap(gitview.log, d, p_int(p, 'limit', 30, 1, 200))
 
     # ---- sudo password prompts in the app (BACKLOG 11): main only; the password is never logged or echoed
     def _session_of_pane(self, pane):

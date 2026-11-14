@@ -1,5 +1,5 @@
 // ClaudeSpace main process: lifecycle, single instance, window, connection, terminals, IPC.
-import { app, clipboard, Menu, nativeTheme, Notification, powerMonitor, shell } from 'electron';
+import { app, clipboard, dialog, Menu, nativeTheme, Notification, powerMonitor, shell } from 'electron';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
@@ -25,6 +25,7 @@ import type { Transport } from './transport/types';
 import { Store } from './store';
 import { DataCache } from './snapshot';
 import { uploadImage } from './images';
+import { FileTransfers } from './files';
 import { createWindow, installCsp, rendererEntry, setOverlayTheme } from './window';
 import { AppTray } from './tray';
 import { Updater } from './updater';
@@ -179,6 +180,18 @@ function effectiveDark(): boolean {
   return t === 'system' ? nativeTheme.shouldUseDarkColors : t === 'dark';
 }
 
+const transfers = new FileTransfers({
+  transport: () => conn.transport,
+  call: (method, params, timeoutMs) => conn.call(method, params, timeoutMs),
+  askSavePath: async (suggested) => {
+    const opts = { defaultPath: suggested, title: 'Сохранить на этом компьютере' };
+    const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
+    return r.canceled || !r.filePath ? null : r.filePath;
+  },
+  downloadsDir: () => app.getPath('downloads'),
+  log,
+});
+
 /** the renderer's startup splash is up (window.ts: caption buttons match its background) */
 let splashOn = true;
 
@@ -317,6 +330,11 @@ const handlers: Handlers = {
     return { ok: false as const, none: true as const };
   },
   'image.upload': ({ data }) => safeUpload(data),
+  'file.download': ({ path }) => transfers.download(path),
+  'file.upload': ({ dir, name, data, overwrite }) => transfers.upload(dir, name, data, overwrite),
+  'file.reveal': ({ path }) => {
+    if (transfers.canReveal(path)) shell.showItemInFolder(path);
+  },
   'launch.rdp': () => launchRdp(store.settings.integrations.rdpScript, { log }),
   'launch.vscode': ({ path }) => {
     const s = store.settings;

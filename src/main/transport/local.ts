@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { mkdir, writeFile, chmod } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import type { Writable } from 'node:stream';
@@ -93,6 +93,10 @@ export class LocalTransport extends EventEmitter implements Transport {
     await mkdir(dirname(p), { recursive: true, mode: 0o700 });
     await writeFile(p, data, { mode });
     await chmod(p, mode);
+  }
+
+  async download(remotePath: string, localPath: string): Promise<void> {
+    await copyFile(isAbsolute(remotePath) ? remotePath : join(this.home, remotePath), localPath);
   }
 
   close(): void {

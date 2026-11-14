@@ -95,6 +95,7 @@ class FakeTransport extends EventEmitter implements Transport {
     return ch;
   }
   async writeFile() {}
+  async download() {}
   close() {}
   debugDrop() {}
   debugFreeze() {}

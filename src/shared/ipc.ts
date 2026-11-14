@@ -9,6 +9,9 @@ import type { AskpassRequest } from './askpass';
 import { askpassReplySchema } from './askpass';
 import type { UpdateState } from './update';
 import type { IPC_CHANNEL_NAMES } from './channels';
+
+/** largest file the Files panel uploads in one go (it travels through IPC in memory) */
+export const FILE_UPLOAD_MAX = 100 * 1024 * 1024;
 import { IPC_EVENT_NAMES } from './channels';
 
 export const termOpenSchema = z
@@ -68,6 +71,16 @@ export const ipcSchemas = {
     .strict(),
   'clipboard.read': z.undefined(),
   'image.pasteClipboard': z.undefined(),
+  'file.download': z.object({ path: z.string().min(1).max(4096) }).strict(),
+  'file.upload': z
+    .object({
+      dir: z.string().min(1).max(4096),
+      name: z.string().min(1).max(255),
+      data: z.instanceof(Uint8Array).refine((d) => d.length <= FILE_UPLOAD_MAX),
+      overwrite: z.boolean().optional(),
+    })
+    .strict(),
+  'file.reveal': z.object({ path: z.string().min(1).max(4096) }).strict(),
   'image.upload': z
     .object({ data: z.instanceof(Uint8Array).refine((d) => d.length <= 20 * 1024 * 1024) })
     .strict(),
@@ -166,6 +179,18 @@ export interface IpcContract {
     args: undefined;
     result: { ok: true; path: string } | { ok: false; error: string } | { ok: false; none: true };
   };
+  /** Files panel: copy a VM file to the PC (save dialog); cancelled = the user closed the dialog */
+  'file.download': {
+    args: { path: string };
+    result: { ok: true; saved: string } | { ok: false; cancelled: true } | { ok: false; error: string };
+  };
+  /** Files panel: put a file from the PC into a VM folder; exists = ask before overwriting */
+  'file.upload': {
+    args: { dir: string; name: string; data: Uint8Array; overwrite?: boolean };
+    result: { ok: true; path: string } | { ok: false; exists: true } | { ok: false; error: string };
+  };
+  /** show a file this app just downloaded in Explorer */
+  'file.reveal': { args: { path: string }; result: void };
   /** upload dropped image bytes to the VM */
   'image.upload': {
     args: { data: Uint8Array };

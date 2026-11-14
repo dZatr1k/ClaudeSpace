@@ -93,6 +93,16 @@ export const methodSchemas = {
   // sudo prompts in the app (BACKLOG 11): main only; the reply carries the password (never logged)
   askpass_enable: z.object({ enabled: z.boolean() }).strict(),
   askpass_reply: askpassReplySchema,
+  // Files and Git panels (stage 5): read-only; uploads/downloads ask for a validated path, main copies over SFTP
+  fs_list: z.object({ path }).strict(),
+  fs_read: z.object({ path }).strict(),
+  fs_upload_target: z.object({ dir: path, name: z.string().min(1).max(255) }).strict(),
+  fs_download_source: z.object({ path }).strict(),
+  git_status: z.object({ path }).strict(),
+  git_diff: z
+    .object({ path, file: path, staged: z.boolean().optional(), untracked: z.boolean().optional() })
+    .strict(),
+  git_log: z.object({ path, limit: z.number().int().min(1).max(200).optional() }).strict(),
 } as const;
 
 /** Methods only main may call (they keep state in main: mount ownership, tunnel). */
@@ -103,6 +113,9 @@ export const MAIN_ONLY_METHODS: readonly string[] = [
   'pc_tunnel_status',
   'askpass_enable',
   'askpass_reply',
+  // the renderer goes through main's file.upload / file.download, which validate first and copy over SFTP
+  'fs_upload_target',
+  'fs_download_source',
 ];
 
 export type Method = keyof typeof methodSchemas;
@@ -142,6 +155,60 @@ export interface MethodResults {
   search_cancel: { cancelled: boolean };
   askpass_enable: { enabled: boolean; listening: boolean; socket: string };
   askpass_reply: Record<string, never>;
+  fs_list: { path: string; entries: FsEntry[]; truncated: boolean };
+  fs_read: FsFile;
+  fs_upload_target: { path: string; exists: boolean };
+  fs_download_source: { path: string; size: number };
+  git_status: GitStatus;
+  git_diff: { root: string; file: string; diff: string; truncated: boolean; binary: boolean };
+  git_log: { root: string | null; commits: GitCommit[] };
+}
+
+/** one entry of a folder listing (Files panel); ~/.ssh and Claude's secrets never appear */
+export interface FsEntry {
+  name: string;
+  type: 'dir' | 'file' | 'other';
+  size: number;
+  mtime: number;
+  hidden: boolean;
+  link: boolean;
+}
+
+export type FsFile = { path: string; size: number; mtime: number } & (
+  | { kind: 'text'; text: string; truncated: boolean }
+  | { kind: 'image'; mime: string; data: string }
+  | { kind: 'binary'; reason?: 'too_large' }
+);
+
+export type GitChange = 'modified' | 'added' | 'deleted' | 'renamed' | 'copied' | 'conflict';
+
+export interface GitFile {
+  path: string;
+  orig: string | null;
+  staged: GitChange | null;
+  unstaged: GitChange | null;
+  untracked: boolean;
+  conflict: boolean;
+}
+
+export type GitStatus =
+  | { root: null }
+  | {
+      root: string;
+      branch: string | null;
+      upstream: string | null;
+      ahead: number;
+      behind: number;
+      files: GitFile[];
+      truncated: boolean;
+    };
+
+export interface GitCommit {
+  hash: string;
+  short: string;
+  subject: string;
+  author: string;
+  at: number;
 }
 
 /** a TCP port some process of the user listens on, on the VM (BACKLOG 10) */

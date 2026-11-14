@@ -32,6 +32,8 @@ export interface Transport extends EventEmitter {
   exec(cmd: string, opts?: ExecOptions): Promise<ExecChannel>;
   /** write a file; relative paths are relative to the remote home */
   writeFile(path: string, data: Buffer, mode: number): Promise<void>;
+  /** copy a remote file to a local path (streamed, any size) */
+  download(remotePath: string, localPath: string): Promise<void>;
   close(): void;
   /**
    * Remote forwarding (ssh -R): the target listens on bindAddr:port; each incoming connection is handed to

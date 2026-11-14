@@ -1,5 +1,6 @@
 // ssh2 transport: one connection, many channels (agent exec, terminal PTYs, SFTP).
 import { EventEmitter } from 'node:events';
+import { createWriteStream } from 'node:fs';
 import type { Socket } from 'node:net';
 import { Client } from 'ssh2';
 import type { ClientChannel, ConnectConfig, SFTPWrapper, TcpConnectionDetails } from 'ssh2';
@@ -171,6 +172,21 @@ export class SshTransport extends EventEmitter implements Transport {
       s.writeFile(path, data, { mode }, (e) => (e ? reject(e) : resolve())),
     );
     await new Promise<void>((resolve, reject) => s.chmod(path, mode, (e) => (e ? reject(e) : resolve())));
+  }
+
+  async download(remotePath: string, localPath: string): Promise<void> {
+    const s = await this.sftp();
+    await new Promise<void>((resolve, reject) => {
+      const src = s.createReadStream(remotePath);
+      const dst = createWriteStream(localPath);
+      src.on('error', (e: Error) => {
+        dst.destroy();
+        reject(e);
+      });
+      dst.on('error', reject);
+      dst.on('finish', () => resolve());
+      src.pipe(dst);
+    });
   }
 
   close(): void {
