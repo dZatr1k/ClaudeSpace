@@ -68,6 +68,13 @@ jobs:
       - run: npm ci
       # typecheck + agent bundle + electron-vite build
       - run: npm run build
+      # create the release up front: electron-builder uploads the installer and its blockmap in parallel, and
+      # with no release yet each upload created its own — two releases per tag
+      - name: Create the GitHub release
+        shell: bash
+        run: gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes "ClaudeSpace $GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and publish the installer
         run: npx electron-builder --win --x64 --publish always
         env:
