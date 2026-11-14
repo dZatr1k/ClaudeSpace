@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Several chats on screen: the layout button in the title bar shows one tab, two side by side, two stacked or
+  four. Clicking a tab puts it into the focused pane; Ctrl+Alt+← / → moves between panes. The layout is restored
+  on the next start.
 - Usage (System → Расход): the current 5-hour window as tiles (tokens, time to reset, pace, projection) and
   charts for 7, 14 or 30 days by day, project and model.
 - WebGL terminal renderer checks itself: if glyphs come out much narrower than they should (a GPU issue seen on

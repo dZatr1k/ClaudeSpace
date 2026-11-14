@@ -4,6 +4,7 @@ import { CLAUDE_MODELS } from '@shared/protocol';
 import { activeClaude, canCommand, canInterrupt, claudeAction, setModel } from './lib/claude';
 import { pasteClipboardImage } from './lib/images';
 import { newTaskDialog } from './lib/worktrees';
+import { SPLIT_MODES } from './lib/panes';
 import { openClaudeScreen } from './components/Overlays/ClaudeScreen';
 import { invoke } from './bridge';
 import { t } from './i18n/ru';
@@ -191,6 +192,15 @@ export function runAppCommand(id: AppCommandId): void {
     case 'rdp':
       A.openRdp();
       return;
+    case 'pane.next':
+    case 'pane.prev': {
+      const s = useTabs.getState();
+      if (s.split === 'single') return;
+      s.cyclePane(id === 'pane.next' ? 1 : -1);
+      const tab = activeTab();
+      if (tab) getHandle(tab.id)?.term.focus();
+      return;
+    }
     case 'resync':
       if (online) void A.resync();
       else void invoke('conn.retryNow');
@@ -277,6 +287,11 @@ export function getCommands(): Command[] {
         ]
       : []),
     ...claudeCommands(),
+    ...SPLIT_MODES.map((m) => ({
+      id: `split.${m}`,
+      title: t.split.palette(t.split.modes[m] ?? m),
+      run: () => useTabs.getState().setSplit(m),
+    })),
     ...(['instructions', 'memory', 'mcp', 'skills', 'plugins', 'hooks'] as const).map((s) => ({
       id: `claudeScreen.${s}`,
       title: `${t.claudeScreen.title}: ${t.claudeScreen.nav[s].toLowerCase()}`,

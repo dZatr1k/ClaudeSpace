@@ -49,6 +49,10 @@ test.beforeAll(() => {
   killTmux();
   fh = makeFakeHome();
   writeFileSync(join(fh.home, '.tmux.conf'), `set -g status-right '"vm" %H:%M %d-%b-%y'\n`);
+  // shell tabs: a neutral prompt, the real user and host name must not end up in docs/screenshots
+  writeFileSync(join(fh.home, '.bashrc'), "PS1='vm:\\w$ '\n");
+  writeFileSync(join(fh.home, '.bash_profile'), '. ~/.bashrc\n'); // shell tabs run bash -l
+  writeFileSync(join(fh.home, '.sudo_as_admin_successful'), '');
   ud = mkdtempSync(join(tmpdir(), 'cs-e2e-ud-'));
   writeFileSync(
     join(ud, 'settings.json'),
@@ -338,6 +342,26 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await win.screenshot({ path: join(SHOTS, '24-usage-light.png') });
   await setTheme(win, 'dark');
   await win.keyboard.press('Escape');
+
+  // split view: two side by side; an empty pane takes the next tab opened; back to one
+  await win.getByTestId('split-menu').click();
+  await win.getByRole('menuitem', { name: 'Две рядом' }).click();
+  const empty = win.locator('[data-empty-pane="1"]');
+  await expect(empty).toBeVisible();
+  await expect(win.locator('[data-pane="0"]')).toBeVisible();
+  await empty.click();
+  await win.keyboard.press('Control+Shift+S');
+  await expect(win.locator('[data-pane="1"]')).toBeVisible({ timeout: 10_000 });
+  await expect(empty).toBeHidden();
+  await win.screenshot({ path: join(SHOTS, '25-split.png') });
+  await win.locator('[data-pane="0"]').click({ position: { x: 200, y: 200 } });
+  await expect(win.getByTestId('claude-bar')).toBeVisible(); // focus is back on the Claude tab
+  await win.keyboard.press('Control+Alt+ArrowRight');
+  await expect(win.getByTestId('claude-bar')).toBeHidden(); // the shell pane has no Claude bar
+  await win.keyboard.press('Control+Shift+W');
+  await win.getByTestId('split-menu').click();
+  await win.getByRole('menuitem', { name: 'Одна вкладка' }).click();
+  await expect(win.locator('[data-pane="1"]')).toHaveCount(0);
 
   // system overlay (doctor) and settings
   await win.evaluate(() => document.querySelector<HTMLElement>('[data-testid="status-conn"]')?.blur());

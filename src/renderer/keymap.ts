@@ -37,6 +37,8 @@ export type AppCommandId =
   | 'settings'
   | 'system.usage'
   | 'rdp'
+  | 'pane.next'
+  | 'pane.prev'
   | 'resync'
   | 'fullscreen'
   | 'devtools';
@@ -73,6 +75,9 @@ export function appShortcut(e: KeyLike, inTerminal: boolean, dev = false): AppCo
     return null;
   }
   if (ctrl && alt && !shift && L === 'R') return 'rdp';
+  // split view: the next / previous pane
+  if (ctrl && alt && !shift && e.key === 'ArrowRight') return 'pane.next';
+  if (ctrl && alt && !shift && e.key === 'ArrowLeft') return 'pane.prev';
   if (alt) return null; // Alt+arrows etc. belong to tmux
   // Shift without Ctrl is typing: capitals and symbols (on the Russian layout "," is Shift+/, "№" is Shift+3…).
   // Never treat it as a shortcut — everything below requires Ctrl.
@@ -143,6 +148,8 @@ export const HOTKEY_LABELS: Partial<Record<AppCommandId, string>> = {
   palette: 'Ctrl+Shift+P',
   'search.chats': 'Ctrl+Shift+H',
   'tab.next': 'Ctrl+Tab',
+  'pane.next': 'Ctrl+Alt+→',
+  'pane.prev': 'Ctrl+Alt+←',
   'tab.prev': 'Ctrl+Shift+Tab',
   'chat.newHere': 'Ctrl+Shift+N',
   'chat.newDialog': 'Ctrl+Shift+T',

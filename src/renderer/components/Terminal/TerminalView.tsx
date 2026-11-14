@@ -11,6 +11,7 @@ import { useConn } from '../../stores/conn';
 import { useData } from '../../stores/data';
 import { attachDroppedFiles } from '../../lib/images';
 import { useTabs } from '../../stores/tabs';
+import { paneRect } from '../../lib/panes';
 import { useUi } from '../../stores/ui';
 import { Button } from '../ui/Button';
 import { ContextMenu } from '../ui/Menu';
@@ -206,7 +207,16 @@ function TermOverlay({ tab }: { tab: Tab }) {
   }
 }
 
-export function TerminalView({ tab, active }: { tab: Tab; active: boolean }) {
+/** pane: where this tab sits in split view (lib/panes.ts), null = not on screen; active = the focused one */
+export function TerminalView({
+  tab,
+  active,
+  pane,
+}: {
+  tab: Tab;
+  active: boolean;
+  pane: { index: number; rect: ReturnType<typeof paneRect>; split: boolean } | null;
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const settings = useUi((u) => u.settings);
   const online = useConn((c) => c.state.kind === 'online');
@@ -295,7 +305,21 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }) {
   const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files');
   return (
     <div
-      className={`absolute inset-0 ${active ? '' : 'invisible pointer-events-none'}`}
+      className={`absolute ${pane ? '' : 'invisible pointer-events-none'} ${pane?.split && pane.rect.left > 0 ? 'border-l border-line' : ''} ${pane?.split && pane.rect.top > 0 ? 'border-t border-line' : ''}`}
+      style={
+        pane
+          ? {
+              left: `${pane.rect.left}%`,
+              top: `${pane.rect.top}%`,
+              width: `${pane.rect.width}%`,
+              height: `${pane.rect.height}%`,
+            }
+          : { inset: 0 }
+      }
+      data-pane={pane?.index}
+      onMouseDownCapture={() => {
+        if (pane?.split && !active) useTabs.getState().focusPane(pane.index);
+      }}
       data-terminal={tab.id}
       data-term-state={tab.term}
       onDragEnter={(e) => {
@@ -335,7 +359,13 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }) {
           className="h-full w-full transition-opacity duration-200"
         />
       </ContextMenu>
-      {active && <TermOverlay tab={tab} />}
+      {pane && <TermOverlay tab={tab} />}
+      {pane?.split && active && (
+        <div
+          className="pointer-events-none absolute inset-0 z-10 shadow-[inset_0_0_0_1px_var(--accent)]"
+          aria-hidden
+        />
+      )}
       {dragging && (
         <div
           className="pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-accent bg-base/80"
@@ -359,11 +389,37 @@ function termOpts() {
 export function TerminalStack() {
   const tabs = useTabs((s) => s.tabs);
   const activeId = useTabs((s) => s.activeId);
+  const split = useTabs((s) => s.split);
+  const panes = useTabs((s) => s.panes);
+  const focus = useTabs((s) => s.focus);
+  const isSplit = split !== 'single';
+  const paneOf = (id: string) => {
+    const index = isSplit ? panes.indexOf(id) : id === activeId ? 0 : -1;
+    return index < 0 ? null : { index, rect: paneRect(split, index), split: isSplit };
+  };
   return (
     <div className="relative h-full w-full bg-base">
       {tabs.map((tab) => (
-        <TerminalView key={tab.id} tab={tab} active={tab.id === activeId} />
+        <TerminalView key={tab.id} tab={tab} active={tab.id === activeId} pane={paneOf(tab.id)} />
       ))}
+      {isSplit &&
+        panes.map((id, i) => {
+          if (id) return null;
+          const r = paneRect(split, i);
+          return (
+            <button
+              key={`empty-${i}`}
+              type="button"
+              data-empty-pane={i}
+              className={`absolute flex flex-col items-center justify-center gap-1 px-6 text-center text-[13px] text-muted ${r.left > 0 ? 'border-l border-line' : ''} ${r.top > 0 ? 'border-t border-line' : ''} ${focus === i ? 'shadow-[inset_0_0_0_1px_var(--accent)]' : ''}`}
+              style={{ left: `${r.left}%`, top: `${r.top}%`, width: `${r.width}%`, height: `${r.height}%` }}
+              onClick={() => useTabs.getState().focusPane(i)}
+            >
+              <span className="font-medium text-fg">{t.split.emptyTitle}</span>
+              <span className="max-w-[320px] text-[12px] leading-relaxed">{t.split.emptyHint}</span>
+            </button>
+          );
+        })}
     </div>
   );
 }

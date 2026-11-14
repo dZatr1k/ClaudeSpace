@@ -104,6 +104,7 @@ async function init() {
       useTabs
         .getState()
         .setAll(tabs, tabs.some((x) => x.id === ws.activeTabId) ? ws.activeTabId : (tabs[0]?.id ?? null));
+      if (ws.split && ws.split !== 'single') useTabs.getState().restorePanes(ws.split, ws.panes ?? []);
     }
   }
 
@@ -147,13 +148,15 @@ async function init() {
 
   // persist workspace (debounced in main)
   const save = () => {
-    const { tabs, activeId } = useTabs.getState();
+    const { tabs, activeId, split, panes } = useTabs.getState();
     const w: Workspace = {
       version: 1,
       tabs: tabs
         .filter((x) => x.kind === 'tmux')
         .map(({ id, kind, session, chatId, cwd, title }) => ({ id, kind, session, chatId, cwd, title })),
       activeTabId: activeId,
+      split,
+      panes: split === 'single' ? [] : panes,
       layout: useUi.getState().layout,
       window: null,
     };

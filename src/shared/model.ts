@@ -243,6 +243,9 @@ export interface Workspace {
   version: 1;
   tabs: Pick<Tab, 'id' | 'kind' | 'session' | 'chatId' | 'cwd' | 'title'>[];
   activeTabId: string | null;
+  /** split view (lib/panes.ts): layout and the tab id per pane; missing in older files = one tab */
+  split?: 'single' | 'cols' | 'rows' | 'grid';
+  panes?: (string | null)[];
   layout: WorkspaceLayout;
   window: WindowBounds | null;
 }

@@ -1,5 +1,9 @@
 import {
   BookText,
+  Columns2,
+  LayoutGrid,
+  Rows2,
+  Square,
   ChevronDown,
   GitBranch,
   LoaderCircle,
@@ -17,6 +21,8 @@ import type { Tab, UiStatus } from '@shared/model';
 import * as A from '../../actions';
 import { invoke } from '../../bridge';
 import { openClaudeScreen } from '../Overlays/ClaudeScreen';
+import type { SplitMode } from '../../lib/panes';
+import { SPLIT_MODES } from '../../lib/panes';
 import { t } from '../../i18n/ru';
 import { formatAgo } from '../../lib/format';
 import { sessionStatus } from '../../lib/status';
@@ -153,6 +159,53 @@ export function ConnPopover({
         </div>
       )}
     </div>
+  );
+}
+
+const SPLIT_ICON: Record<SplitMode, typeof Square> = {
+  single: Square,
+  cols: Columns2,
+  rows: Rows2,
+  grid: LayoutGrid,
+};
+
+/** split view: one tab, two side by side, two stacked, four (lib/panes.ts) */
+function SplitMenu() {
+  const split = useTabs((s) => s.split);
+  const Icon = SPLIT_ICON[split];
+  return (
+    <DropdownMenu
+      align="end"
+      items={[
+        ...SPLIT_MODES.map((m) => {
+          const I = SPLIT_ICON[m];
+          return {
+            label: t.split.modes[m] ?? m,
+            icon: <I size={13} />,
+            hint: m === split ? '✓' : undefined,
+            run: () => useTabs.getState().setSplit(m),
+          };
+        }),
+        'sep' as const,
+        {
+          label: t.split.next,
+          hint: 'Ctrl+Alt+→',
+          disabled: split === 'single',
+          run: () => useTabs.getState().cyclePane(1),
+        },
+      ]}
+      trigger={
+        <button
+          type="button"
+          title={t.split.menu}
+          aria-label={t.split.menu}
+          data-testid="split-menu"
+          className="no-drag flex h-7 items-center rounded-[6px] px-1.5 text-muted transition-colors duration-100 hover:bg-hover hover:text-fg active:bg-selected"
+        >
+          <Icon size={15} aria-hidden />
+        </button>
+      }
+    />
   );
 }
 
@@ -329,6 +382,7 @@ export function TitleBar() {
           <span className="hidden lg:inline">{t.actions.paletteTrigger}</span>
           <Kbd>Ctrl K</Kbd>
         </button>
+        <SplitMenu />
         <IconButton title={t.claudeScreen.open} onClick={() => openClaudeScreen()}>
           <BookText size={15} aria-hidden />
           <span className="ml-1 text-[12px]">Claude</span>
