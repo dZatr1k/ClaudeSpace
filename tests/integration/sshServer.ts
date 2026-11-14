@@ -28,10 +28,15 @@ export interface TestServer {
 }
 
 export function genKey(passphrase?: string): { private: string; public: string } {
-  const k = passphrase
-    ? utils.generateKeyPairSync('ed25519', { passphrase, cipher: 'aes256-ctr', rounds: 4 } as never)
-    : utils.generateKeyPairSync('ed25519', {} as never);
-  return { private: k.private, public: k.public };
+  // ssh2's generator occasionally (~0.5%) emits an ed25519 key its own parser rejects ("Malformed OpenSSH
+  // private key"): retry until the key parses, otherwise tests fail at random.
+  for (;;) {
+    const k = passphrase
+      ? utils.generateKeyPairSync('ed25519', { passphrase, cipher: 'aes256-ctr', rounds: 4 } as never)
+      : utils.generateKeyPairSync('ed25519', {} as never);
+    if (!(utils.parseKey(k.private, passphrase) instanceof Error))
+      return { private: k.private, public: k.public };
+  }
 }
 
 export function startServer(opts: {
