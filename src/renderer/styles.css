@@ -284,3 +284,73 @@ textarea,
   margin: 2px 0 4px 16px;
   padding: 0;
 }
+
+/* ---------------------------------------------------------------- file viewer (stage 5) */
+/* diff lines: a tinted row plus the +/- the line already starts with (colour is not the only signal) */
+.diff-add {
+  background: color-mix(in srgb, var(--st-idle) 14%, transparent);
+}
+.diff-del {
+  background: color-mix(in srgb, var(--st-error) 14%, transparent);
+}
+/* a whole markdown document: headings by size and weight, code blocks on the panel colour */
+.md-doc h1,
+.md-doc h2,
+.md-doc h3,
+.md-doc h4 {
+  margin: 16px 0 6px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.md-doc h1 {
+  font-size: 20px;
+}
+.md-doc h2 {
+  font-size: 16px;
+}
+.md-doc h3,
+.md-doc h4 {
+  font-size: 14px;
+}
+.md-doc > :first-child {
+  margin-top: 0;
+}
+.md-doc p {
+  margin: 0 0 10px;
+}
+.md-doc pre {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--bg-surface);
+  white-space: pre;
+  overflow-x: auto;
+}
+.md-doc pre code {
+  background: none;
+  padding: 0;
+}
+.md-doc ul,
+.md-doc ol {
+  margin: 4px 0 10px 20px;
+}
+.md-doc a {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+.md-doc blockquote {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-muted);
+}
+.md-doc table {
+  border-collapse: collapse;
+  margin: 8px 0 12px;
+}
+.md-doc th,
+.md-doc td {
+  border: 1px solid var(--border-strong);
+  padding: 4px 8px;
+  text-align: left;
+}

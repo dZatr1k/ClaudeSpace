@@ -98,7 +98,8 @@ export function formatLeft(min: number | null | undefined): string {
 
 export function formatBytes(n: number): string {
   if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} МБ`;
-  return `${Math.max(1, Math.round(n / 1024))} КБ`;
+  if (n < 1024) return `${n} Б`;
+  return `${Math.round(n / 1024)} КБ`;
 }
 
 export function formatUptime(sec: number): string {

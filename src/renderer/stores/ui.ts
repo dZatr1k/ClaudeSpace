@@ -40,6 +40,11 @@ export type Dialog =
   | { kind: 'clone' }
   | { kind: 'paste'; text: string; onConfirm: () => void };
 
+/** the file / diff viewer over the window (stage 5) */
+export type Viewer =
+  | { kind: 'file'; path: string }
+  | { kind: 'diff'; root: string; file: string; staged: boolean; untracked: boolean };
+
 interface UiStore {
   selection: Selection;
   layout: WorkspaceLayout;
@@ -54,6 +59,7 @@ interface UiStore {
   system: SystemSection | null;
   settingsOpen: SettingsSection | null;
   dialog: Dialog | null;
+  viewer: Viewer | null;
   toasts: Toast[];
   settings: Settings | null;
   appInfo: AppInfo | null;
@@ -90,6 +96,7 @@ export const useUi = create<UiStore>((set) => ({
   system: null,
   settingsOpen: null,
   dialog: null,
+  viewer: null,
   toasts: [],
   settings: null,
   appInfo: null,

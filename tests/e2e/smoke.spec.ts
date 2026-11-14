@@ -140,6 +140,54 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await expect(win.getByRole('tab', { name: 'Чаты' })).toHaveAttribute('aria-selected', 'true');
   await expect(win.getByTestId('chat-11111111-1111-4111-8111-111111111111')).toBeVisible();
 
+  // Files and Git tabs (stage 5) for the Alpha project: tree, viewer, git groups, diff; secrets never listed
+  await win.getByRole('tab', { name: 'Проекты' }).click();
+  await win.getByTestId('project-Alpha').click();
+  const panel = win.locator('[data-right-panel]');
+  await panel.getByRole('tab', { name: 'Файлы' }).click();
+  const tree = win.getByTestId('files-tree');
+  await expect(tree.getByRole('button', { name: /^CLAUDE\.md/ })).toBeVisible({ timeout: 10_000 });
+  await tree.getByRole('button', { name: /^CLAUDE\.md/ }).click();
+  const viewer = win.getByRole('dialog');
+  await expect(viewer.getByRole('heading', { name: 'Alpha' })).toBeVisible();
+  await win.screenshot({ path: join(SHOTS, '14-file-viewer.png') });
+  await viewer.getByRole('button', { name: 'Текст' }).click();
+  await expect(viewer.locator('pre')).toContainText('# Alpha');
+  await win.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
+  await panel.getByRole('tab', { name: 'Git' }).click();
+  await expect(panel).toContainText('Новые файлы', { timeout: 10_000 });
+  await expect(panel).toContainText('main');
+  await panel.getByRole('button', { name: /CLAUDE\.md/ }).click();
+  await expect(viewer.locator('pre')).toContainText('+# Alpha');
+  await win.screenshot({ path: join(SHOTS, '15-git-diff.png') });
+  await win.keyboard.press('Escape');
+  await setTheme(win, 'light');
+  await win.screenshot({ path: join(SHOTS, '17-git-light.png') });
+  await setTheme(win, 'dark');
+  // upload from the PC: through main -> agent check -> SFTP; an existing name needs overwrite; ~/.ssh is refused
+  const up = (dir: string, name: string, overwrite?: boolean) =>
+    win.evaluate(
+      ([dir, name, overwrite]) =>
+        window.cs.invoke('file.upload', {
+          dir: dir as string,
+          name: name as string,
+          data: new TextEncoder().encode('from the PC\n'),
+          overwrite: overwrite as boolean,
+        }),
+      [dir, name, overwrite ?? false] as const,
+    );
+  expect(await up(fh.alpha, 'notes.txt')).toEqual({ ok: true, path: join(fh.alpha, 'notes.txt') });
+  expect(readFileSync(join(fh.alpha, 'notes.txt'), 'utf8')).toBe('from the PC\n');
+  expect(await up(fh.alpha, 'notes.txt')).toEqual({ ok: false, exists: true });
+  expect((await up(fh.alpha, 'notes.txt', true)).ok).toBe(true);
+  expect((await up(join(fh.home, '.ssh'), 'authorized_keys')).ok).toBe(false);
+  await panel.getByRole('tab', { name: 'Файлы' }).click();
+  await panel.getByRole('button', { name: 'Обновить' }).click();
+  await expect(tree.getByRole('button', { name: /^notes\.txt/ })).toBeVisible();
+  await win.screenshot({ path: join(SHOTS, '16-files.png') });
+  await panel.getByRole('tab', { name: 'Сведения' }).click();
+
   // palette
   await win.keyboard.press('Control+Shift+P');
   await expect(win.getByPlaceholder(/Чаты, проекты/)).toBeVisible();

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+- Files tab: the folder of the current chat, project or session as a tree with git marks; a viewer for text,
+  markdown and images; paste a path into the chat, download to the PC, open in VS Code; drop files from the PC
+  onto a folder to upload them.
+- Git tab: branch and upstream, changed files by group, recent commits, a diff viewer; changes are made in lazygit.
+
 ## 0.5.0
 - Images in chats: paste a screenshot with Ctrl+V or drop image files onto a terminal. The image is uploaded
   to the VM (`~/.cache/claudespace/images`, kept for a week) and its path is pasted, so Claude Code attaches it.

@@ -16,6 +16,7 @@ import { SystemView } from './components/Overlays/SystemView';
 import { SettingsOverlay } from './components/Overlays/Settings';
 import { ConnectScreen } from './components/Overlays/ConnectScreen';
 import { StartupSplash } from './splash/StartupSplash';
+import { FileViewer } from './components/Overlays/FileViewer';
 import { Dialogs, Toasts } from './components/Overlays/Dialogs';
 import { AskpassDialog } from './components/Overlays/AskpassDialog';
 import { ChatSearch } from './components/Overlays/ChatSearch';
@@ -139,6 +140,7 @@ export function App() {
       <Dialogs />
       <AskpassDialog />
       <Toasts />
+      <FileViewer />
       <StartupSplash />
       <UpdateNotice />
     </div>

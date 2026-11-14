@@ -110,7 +110,8 @@ def diff(d, rel, staged=False, untracked=False):
         raise GitError('not_found', 'это не git-репозиторий')
     full = _inside(root, rel)
     if untracked:
-        out = _git(root, 'diff', '--no-color', '--no-index', '--', '/dev/null', full, ok=(0, 1))
+        # relative to the repo root (git runs there), so the header shows b/<file>, not the absolute path
+        out = _git(root, 'diff', '--no-color', '--no-index', '--', '/dev/null', os.path.relpath(full, root), ok=(0, 1))
     else:
         args = ['diff', '--no-color', '--no-ext-diff', '-M']
         if staged:
