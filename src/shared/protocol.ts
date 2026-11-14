@@ -62,6 +62,12 @@ export const methodSchemas = {
   rename_chat: z.object({ chatId, title: z.string().max(200).nullable() }).strict(),
   create_project: z.object({ path, gitInit: z.boolean().optional() }).strict(),
   usage: z.object({ maxAge: z.number().int().min(0).max(86400).optional() }).strict(),
+  usage_report: z
+    .object({
+      days: z.union([z.literal(7), z.literal(14), z.literal(30)]).optional(),
+      maxAge: z.number().int().min(0).max(86400).optional(),
+    })
+    .strict(),
   doctor: z.object({ full: z.boolean().optional() }).strict(),
   system: z.object({ top: z.boolean().optional() }).strict(),
   mosh_list: empty,
@@ -169,6 +175,7 @@ export interface MethodResults {
   rename_chat: { chat: Chat };
   create_project: { project: Project };
   usage: Usage;
+  usage_report: UsageReport;
   doctor: Doctor;
   system: SystemStats;
   mosh_list: { servers: { pid: number; ageSec: number; current: boolean }[] };
@@ -274,6 +281,51 @@ export interface WinfsMount {
   client?: string | null;
 }
 
+/** «Расход» charts (cclib/usage.py build_report): tokens include cache reads, as ccusage counts them */
+export interface UsageDay {
+  day: string;
+  tokens: number;
+  costUsd: number;
+  models: Record<string, number>;
+}
+export interface UsageBlock {
+  start: number;
+  end: number;
+  tokens: number;
+  costUsd: number;
+  active: boolean;
+}
+export type UsageReport =
+  | {
+      ok: true;
+      days: number;
+      daily: UsageDay[];
+      /** top projects by tokens; folder null = the rest («другие») */
+      projects: {
+        folder: string | null;
+        label: string | null;
+        tokens: number;
+        costUsd: number;
+        chats: number;
+      }[];
+      models: { name: string; tokens: number; costUsd: number }[];
+      blocks: UsageBlock[];
+      active:
+        | (UsageBlock & {
+            tpm: number | null;
+            costPerHour: number | null;
+            leftMin: number;
+            projectedTokens: number | null;
+            projectedCostUsd: number | null;
+            models: string[];
+          })
+        | null;
+      totalTokens: number;
+      totalCostUsd: number;
+      at: number;
+    }
+  | { ok: false; days: number; error: string; at: number };
+
 /** a linked worktree of a repo (not the main checkout); ours = under .claude/worktrees; dirty = changed files */
 export interface GitWorktree {
   path: string;
@@ -369,6 +421,7 @@ export function methodTimeout(m: Method): number {
     m === 'create_project' ||
     m === 'system' ||
     m === 'worktree_create' ||
+    m === 'usage_report' ||
     m === 'worktree_remove'
   )
     return 30_000;

@@ -55,6 +55,46 @@ test.beforeAll(() => {
     JSON.stringify({ connection: { mode: 'local', tmuxSocket: TMUX_SOCKET }, appearance: { theme: 'dark' } }),
   );
   mkdirSync(SHOTS, { recursive: true });
+  // a fake ccusage with a week of numbers for the «Расход» charts (the real one reads ~/.claude logs)
+  const day = (n: number) => new Date(Date.now() - n * 86400_000).toLocaleDateString('sv-SE');
+  const tok = [12, 30, 0, 48, 22, 61, 35].map((m) => m * 1e6);
+  const daily = {
+    daily: tok.map((v, i) => ({
+      period: day(6 - i),
+      totalTokens: v,
+      totalCost: v / 2.5e6,
+      modelBreakdowns: v
+        ? [{ modelName: 'claude-opus-5-5', inputTokens: v * 0.9, outputTokens: v * 0.1, cost: v / 2.5e6 }]
+        : [],
+    })),
+  };
+  const now = Date.now();
+  const blocks = {
+    blocks: [
+      {
+        startTime: new Date(now - 90 * 60_000).toISOString(),
+        endTime: new Date(now + 210 * 60_000).toISOString(),
+        totalTokens: 35e6,
+        costUSD: 14,
+        isActive: true,
+        burnRate: { tokensPerMinute: 390_000, costPerHour: 9.3 },
+        projection: { totalTokens: 117e6, totalCost: 46 },
+        models: ['claude-opus-5-5'],
+      },
+    ],
+  };
+  const sessions = {
+    session: [
+      { period: '11111111-1111-4111-8111-111111111111', totalTokens: 140e6, totalCost: 56 },
+      { period: 'ffffffff-ffff-4fff-8fff-ffffffffffff', totalTokens: 68e6, totalCost: 27 },
+    ],
+  };
+  mkdirSync(join(fh.home, 'fake-ccusage'), { recursive: true });
+  for (const [k, v] of Object.entries({ daily, blocks, session: sessions }))
+    writeFileSync(join(fh.home, 'fake-ccusage', `${k}.json`), JSON.stringify(v));
+  writeFileSync(join(fh.home, '.local', 'bin', 'ccusage'), `#!/bin/sh\ncat "$HOME/fake-ccusage/$1.json"\n`, {
+    mode: 0o755,
+  });
 });
 
 test.afterAll(() => {
@@ -281,6 +321,22 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await expect(cs).toContainText('npx @playwright/mcp');
   await expect(cs).not.toContainText('sk-e2e-secret');
   await win.screenshot({ path: join(SHOTS, '20-claude-mcp.png') });
+  await win.keyboard.press('Escape');
+
+  // «Расход»: the current window and the week by day, project and model (fake ccusage)
+  await win.getByRole('button', { name: /окно 5 ч/ }).click();
+  const usage = win.getByTestId('usage-report');
+  await expect(usage).toBeVisible({ timeout: 30_000 });
+  await expect(win.getByTestId('usage-window')).toContainText('35.0M');
+  await expect(usage).toContainText('всего 208.0M');
+  await expect(usage).toContainText('Alpha');
+  await expect(usage).toContainText('opus 5.5');
+  await usage.locator('svg rect').nth(5).hover();
+  await expect(usage.getByRole('status')).toContainText('61.0M');
+  await win.screenshot({ path: join(SHOTS, '23-usage.png') });
+  await setTheme(win, 'light');
+  await win.screenshot({ path: join(SHOTS, '24-usage-light.png') });
+  await setTheme(win, 'dark');
   await win.keyboard.press('Escape');
 
   // system overlay (doctor) and settings

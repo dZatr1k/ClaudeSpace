@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Usage (System → Расход): the current 5-hour window as tiles (tokens, time to reset, pace, projection) and
+  charts for 7, 14 or 30 days by day, project and model.
 - WebGL terminal renderer checks itself: if glyphs come out much narrower than they should (a GPU issue seen on
   Windows), the terminal switches to the DOM renderer and says so.
 

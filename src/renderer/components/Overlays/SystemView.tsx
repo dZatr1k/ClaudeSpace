@@ -1,106 +1,16 @@
 import { Cpu, Gauge, RefreshCw, Stethoscope, WifiOff } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import type { Doctor, SystemStats, Usage } from '@shared/model';
+import type { Doctor, SystemStats } from '@shared/model';
 import { agent } from '../../bridge';
 import { t } from '../../i18n/ru';
-import { formatAgo, formatLeft, formatTokens, formatUptime } from '../../lib/format';
+import { formatAgo, formatUptime } from '../../lib/format';
 import { useConn } from '../../stores/conn';
 import { useData } from '../../stores/data';
 import type { SystemSection } from '../../stores/ui';
 import { useUi } from '../../stores/ui';
 import { Button } from '../ui/Button';
+import { UsageReportPane } from './UsageReport';
 import { Modal } from '../ui/Modal';
-
-function hhmm(ms: number) {
-  const d = new Date(ms);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function UsagePane() {
-  const cached = useData((d) => d.usage);
-  const online = useConn((c) => c.state.kind === 'online');
-  const [u, setU] = useState<Usage | null>(cached);
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const load = useCallback(async (maxAge: number) => {
-    setBusy(true);
-    try {
-      const r = await agent('usage', { maxAge });
-      setU(r);
-      useData.getState().setUsage(r);
-      setErr(null);
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }, []);
-  useEffect(() => {
-    if (online) void load(60);
-  }, [online, load]);
-  if (!u)
-    return (
-      <div className="text-muted" role="status">
-        {err ? t.info.failed(err) : t.info.loading}
-      </div>
-    );
-  if (!u.ok)
-    return (
-      <div className="space-y-2">
-        <div>{u.error === 'ccusage не установлен' ? t.system.noCcusage : (u.error ?? t.system.noAnswer)}</div>
-        <code className="selectable inline-block rounded-[4px] border border-line bg-base px-2 py-1 font-mono text-[12px]">
-          {t.system.ccusageInstall}
-        </code>
-      </div>
-    );
-  const max = Math.max(1, ...u.days.map((d) => d.tokens));
-  return (
-    <div className="space-y-4 text-[13px]">
-      <div>
-        <h3 className="mb-1.5 text-[13px] font-semibold">{t.system.usageWindow}</h3>
-        {u.block ? (
-          <div className="space-y-0.5 text-muted tnum">
-            <div>
-              {t.system.tokens} <span className="text-fg">{formatTokens(u.block.tokens)}</span> ·{' '}
-              {t.system.left} {formatLeft(u.block.leftMin)} · {t.system.apiCost(u.block.costUsd.toFixed(2))}
-            </div>
-            <div>
-              {t.system.models}: {u.block.models.join(', ') || t.system.noModels}
-            </div>
-          </div>
-        ) : (
-          <div className="text-muted">{t.system.noBlock}</div>
-        )}
-      </div>
-      <div>
-        <h3 className="mb-1.5 text-[13px] font-semibold">{t.system.week}</h3>
-        {u.days.map((d) => (
-          <div key={d.day} className="flex items-center gap-2 tnum text-[12px]">
-            <span className="w-12 text-muted">{d.day.slice(5)}</span>
-            <div className="h-3 flex-1 rounded-[3px] bg-hover">
-              <div
-                className="h-3 rounded-[3px] bg-accent"
-                style={{ width: `${Math.max(1, (100 * d.tokens) / max)}%` }}
-              />
-            </div>
-            <span className="w-14 text-right">{formatTokens(d.tokens)}</span>
-          </div>
-        ))}
-        <div className="mt-1 text-[12px] text-muted tnum">
-          {t.system.total} {formatTokens(u.weekTokens)}
-        </div>
-      </div>
-      <div className="text-[12px] leading-snug text-muted">{t.system.usageNote}</div>
-      <div className="flex items-center gap-2 text-[12px] text-muted">
-        {t.system.updated(hhmm(u.at))}
-        <Button small onClick={() => void load(0)} disabled={busy || !online}>
-          <RefreshCw size={12} className={busy ? 'anim-spin' : ''} aria-hidden />
-          {t.system.refresh}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 const LV: Record<string, string> = {
   ok: 'text-st-idle',
@@ -314,7 +224,7 @@ export function SystemView() {
     { id: 'resources', label: t.actions.resources, icon: <Cpu size={14} aria-hidden /> },
   ];
   return (
-    <Modal open onClose={() => useUi.getState().set({ system: null })} title={t.system.title} width={760}>
+    <Modal open onClose={() => useUi.getState().set({ system: null })} title={t.system.title} width={900}>
       <div className="flex min-h-[420px] gap-5">
         <nav className="flex w-36 shrink-0 flex-col gap-0.5 border-r border-line pr-3">
           {items.map((x) => (
@@ -330,7 +240,7 @@ export function SystemView() {
           ))}
         </nav>
         <div className="min-w-0 flex-1">
-          {section === 'usage' && <UsagePane />}
+          {section === 'usage' && <UsageReportPane />}
           {section === 'doctor' && <DoctorPane />}
           {section === 'resources' && <ResourcesPane />}
         </div>

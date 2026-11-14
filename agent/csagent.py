@@ -38,7 +38,8 @@ SEARCH_ID_RE = re.compile(r'^[A-Za-z0-9_-]{1,32}$')
 SLOW = {'usage', 'doctor', 'system', 'project_preview', 'session_preview', 'mosh_list', 'mosh_kill_stale',
         'create_project', 'winfs_mount', 'winfs_unmount', 'pc_tunnel_status', 'askpass_enable',
         'fs_list', 'fs_read', 'git_status', 'git_diff', 'git_log', 'claude_send',
-        'claude_config', 'claude_doc_write', 'git_worktrees', 'worktree_create', 'worktree_remove'}
+        'claude_config', 'claude_doc_write', 'git_worktrees', 'worktree_create', 'worktree_remove',
+        'usage_report'}
 TUNNEL_PORT = 2222
 CLAUDE_ACTION_RE = re.compile(r'^(interrupt|compact|clear|model)$')
 CLAUDE_MODEL_RE = re.compile(r'^(default|opus|sonnet|haiku|opusplan|sonnet\[1m\])$')
@@ -178,7 +179,7 @@ class Agent:
             'fs_list': self.m_fs_list, 'fs_read': self.m_fs_read, 'fs_upload_target': self.m_fs_upload_target,
             'fs_download_source': self.m_fs_download_source,
             'git_status': self.m_git_status, 'git_diff': self.m_git_diff, 'git_log': self.m_git_log,
-            'claude_send': self.m_claude_send,
+            'claude_send': self.m_claude_send, 'usage_report': self.m_usage_report,
             'git_worktrees': self.m_git_worktrees, 'worktree_create': self.m_worktree_create,
             'worktree_remove': self.m_worktree_remove,
             'claude_config': self.m_claude_config, 'claude_doc_write': self.m_claude_doc_write,
@@ -689,6 +690,11 @@ class Agent:
 
     def m_usage(self, p):
         return usage.usage(p_int(p, 'maxAge', 60, 0, 86400))
+
+    def m_usage_report(self, p):
+        days = p_int(p, 'days', 7, 1, 30)
+        chat_project = {c['sid']: c.get('cwd') for c in chats.load_index() if c.get('cwd')}
+        return usage.report(days, chat_project, p_int(p, 'maxAge', 120, 0, 86400))
 
     def m_doctor(self, p):
         return doctor.full() if p_bool(p, 'full', False) else doctor.quick_model()

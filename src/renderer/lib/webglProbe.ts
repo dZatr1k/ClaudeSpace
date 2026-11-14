@@ -56,7 +56,8 @@ export async function probeWebgl(opts: {
 }): Promise<ProbeResult> {
   const host = document.createElement('div');
   // on screen but invisible: xterm pauses drawing for terminals outside the viewport (IntersectionObserver)
-  host.style.cssText = 'position:fixed;left:0;top:0;width:400px;height:80px;opacity:0;pointer-events:none;z-index:-1';
+  host.style.cssText =
+    'position:fixed;left:0;top:0;width:400px;height:80px;opacity:0;pointer-events:none;z-index:-1';
   document.body.appendChild(host);
   const term = new Terminal({
     ...opts,
