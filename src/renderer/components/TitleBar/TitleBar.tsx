@@ -1,4 +1,5 @@
 import {
+  BookText,
   ChevronDown,
   GitBranch,
   LoaderCircle,
@@ -15,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Tab, UiStatus } from '@shared/model';
 import * as A from '../../actions';
 import { invoke } from '../../bridge';
+import { openClaudeScreen } from '../Overlays/ClaudeScreen';
 import { t } from '../../i18n/ru';
 import { formatAgo } from '../../lib/format';
 import { sessionStatus } from '../../lib/status';
@@ -327,6 +329,10 @@ export function TitleBar() {
           <span className="hidden lg:inline">{t.actions.paletteTrigger}</span>
           <Kbd>Ctrl K</Kbd>
         </button>
+        <IconButton title={t.claudeScreen.open} onClick={() => openClaudeScreen()}>
+          <BookText size={15} aria-hidden />
+          <span className="ml-1 text-[12px]">Claude</span>
+        </IconButton>
         <IconButton title={`${t.actions.rdp} (Ctrl+Alt+R)`} onClick={() => A.openRdp()}>
           <Monitor size={15} aria-hidden />
           <span className="ml-1 text-[12px]">RDP</span>

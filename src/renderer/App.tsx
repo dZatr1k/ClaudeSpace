@@ -12,6 +12,7 @@ import { StatusBar } from './components/StatusBar/StatusBar';
 import { StartScreen } from './components/Terminal/StartScreen';
 import { TerminalStack } from './components/Terminal/TerminalView';
 import { ClaudeBar } from './components/Terminal/ClaudeBar';
+import { ClaudeScreen } from './components/Overlays/ClaudeScreen';
 import { Palette } from './components/Palette/Palette';
 import { SystemView } from './components/Overlays/SystemView';
 import { SettingsOverlay } from './components/Overlays/Settings';
@@ -141,6 +142,7 @@ export function App() {
       <ChatSearch />
       <SystemView />
       <SettingsOverlay />
+      <ClaudeScreen />
       <Dialogs />
       <AskpassDialog />
       <Toasts />

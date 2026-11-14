@@ -4,6 +4,7 @@ import type { Settings } from '@shared/settings';
 import type { AppInfo } from '@shared/ipc';
 
 export type SystemSection = 'usage' | 'doctor' | 'resources';
+export type ClaudeSection = 'instructions' | 'memory' | 'mcp' | 'skills' | 'plugins' | 'hooks';
 export type SettingsSection =
   | 'connection'
   | 'pclink'
@@ -57,6 +58,8 @@ interface UiStore {
   /** full-text chat search overlay: the initial query, null = closed */
   chatSearch: string | null;
   system: SystemSection | null;
+  /** the «Claude» screen: section and the folder project-level files are looked up from (null = user only) */
+  claudeScreen: { section: ClaudeSection; folder: string | null } | null;
   settingsOpen: SettingsSection | null;
   dialog: Dialog | null;
   viewer: Viewer | null;
@@ -94,6 +97,7 @@ export const useUi = create<UiStore>((set) => ({
   palette: false,
   chatSearch: null,
   system: null,
+  claudeScreen: null,
   settingsOpen: null,
   dialog: null,
   viewer: null,

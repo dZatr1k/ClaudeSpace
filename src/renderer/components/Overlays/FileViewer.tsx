@@ -66,7 +66,7 @@ function TextBody({ text }: { text: string }) {
   );
 }
 
-function FileBody({ path }: { path: string }) {
+export function FileBody({ path }: { path: string }) {
   const st = useLoad<FsFile>(path, () => agent('fs_read', { path }));
   const isMd = /\.(md|markdown|mdx)$/i.test(path);
   const [rendered, setRendered] = useState(true);

@@ -213,13 +213,52 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await win.screenshot({ path: join(SHOTS, '05-palette.png') });
   await win.keyboard.press('Escape');
 
+  // «Настройки Claude»: the project's CLAUDE.md edited and saved on the VM; MCP keys never reach the window
+  writeFileSync(
+    join(fh.home, '.claude.json'),
+    JSON.stringify({
+      mcpServers: {
+        pw: {
+          command: '/usr/bin/npx',
+          args: ['@playwright/mcp', '--key', 'sk-e2e-secret'],
+          env: { K: 'sk-e2e-secret' },
+        },
+      },
+    }),
+  );
+  await win.getByRole('button', { name: /^Настройки Claude/ }).click();
+  const cs = win.locator('[data-claude-screen]');
+  await expect(
+    cs.getByRole('button', { name: /Папка выше: CLAUDE.md|Проект: CLAUDE.md/ }).first(),
+  ).toBeVisible({
+    timeout: 10_000,
+  });
+  await cs
+    .getByRole('button', { name: /CLAUDE.md.*home\/projects\/Alpha\/CLAUDE.md/ })
+    .first()
+    .click();
+  const editor = cs.getByRole('textbox');
+  await expect(editor).toHaveValue(/# Alpha/);
+  await editor.press('End');
+  await editor.pressSequentially('\nПиши тесты.');
+  await expect(cs).toContainText('есть несохранённые правки');
+  await editor.press('Control+s');
+  await expect(cs).toContainText('сохранено', { timeout: 5000 });
+  expect(readFileSync(join(fh.alpha, 'CLAUDE.md'), 'utf8')).toContain('Пиши тесты.');
+  await win.screenshot({ path: join(SHOTS, '19-claude-instructions.png') });
+  await cs.getByRole('button', { name: /MCP-серверы/ }).click();
+  await expect(cs).toContainText('npx @playwright/mcp');
+  await expect(cs).not.toContainText('sk-e2e-secret');
+  await win.screenshot({ path: join(SHOTS, '20-claude-mcp.png') });
+  await win.keyboard.press('Escape');
+
   // system overlay (doctor) and settings
   await win.evaluate(() => document.querySelector<HTMLElement>('[data-testid="status-conn"]')?.blur());
   await win.getByRole('button', { name: /Claude claude-1.0.0/ }).click();
   await expect(win.getByText('Реестр запущенных Claude')).toBeVisible({ timeout: 30_000 });
   await win.screenshot({ path: join(SHOTS, '06-system-doctor.png') });
   await win.keyboard.press('Escape');
-  await win.getByRole('button', { name: /Настройки/ }).click();
+  await win.getByRole('button', { name: /^Настройки \(/ }).click();
   await win.getByRole('button', { name: 'Внешний вид' }).click();
   await win.screenshot({ path: join(SHOTS, '07-settings.png') });
   await win.keyboard.press('Escape');

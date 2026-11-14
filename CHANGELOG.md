@@ -8,6 +8,9 @@
 - Claude bar under the terminal: the chat's status, Interrupt (Esc), Compact (/compact), Clear (/clear, asks
   first) and a model menu (/model). Commands are typed into the pane where that Claude runs and only while it is
   idle, so a click never answers a permission prompt. The same actions are in the Ctrl+K palette.
+- Claude settings screen (the Claude button in the title bar): edit CLAUDE.md files and memory notes, see MCP
+  servers, skills, plugins and hooks. MCP keys and full server commands stay on the VM. A save never overwrites
+  a file that changed on the VM while you were editing it.
 - Two ClaudeSpace copies on one VM (say, a dev build and the installed app) no longer unmount each other's PC disk
   on exit.
 

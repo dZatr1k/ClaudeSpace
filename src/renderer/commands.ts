@@ -3,6 +3,7 @@ import { defaultSettings } from '@shared/settings';
 import { CLAUDE_MODELS } from '@shared/protocol';
 import { activeClaude, canCommand, canInterrupt, claudeAction, setModel } from './lib/claude';
 import { pasteClipboardImage } from './lib/images';
+import { openClaudeScreen } from './components/Overlays/ClaudeScreen';
 import { invoke } from './bridge';
 import { t } from './i18n/ru';
 import { basename } from './lib/format';
@@ -269,6 +270,12 @@ export function getCommands(): Command[] {
         ]
       : []),
     ...claudeCommands(),
+    ...(['instructions', 'memory', 'mcp', 'skills', 'plugins', 'hooks'] as const).map((s) => ({
+      id: `claudeScreen.${s}`,
+      title: `${t.claudeScreen.title}: ${t.claudeScreen.nav[s].toLowerCase()}`,
+      needsVm: true,
+      run: () => openClaudeScreen(s),
+    })),
     {
       id: 'shell.home',
       title: t.actions.shellHome,

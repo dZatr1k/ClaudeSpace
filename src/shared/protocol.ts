@@ -114,6 +114,11 @@ export const methodSchemas = {
     .strict(),
   git_log: z.object({ path, limit: z.number().int().min(1).max(200).optional() }).strict(),
   // quick actions for a running chat: a fixed command typed into its Claude pane (no free text)
+  // the «Claude» screen: overview (secrets stay in the agent) and edits of CLAUDE.md / memory notes only
+  claude_config: z.object({ path: path.optional() }).strict(),
+  claude_doc_write: z
+    .object({ path, text: z.string().max(512 * 1024), mtime: z.number().int().min(0).nullable() })
+    .strict(),
   claude_send: z.discriminatedUnion('action', [
     z.object({ chatId, action: z.enum(['interrupt', 'compact', 'clear']) }).strict(),
     z.object({ chatId, action: z.literal('model'), model: z.enum(CLAUDE_MODELS) }).strict(),
@@ -178,6 +183,8 @@ export interface MethodResults {
   git_diff: { root: string; file: string; diff: string; truncated: boolean; binary: boolean };
   git_log: { root: string | null; commits: GitCommit[] };
   claude_send: { pane: string; status: string };
+  claude_config: ClaudeConfig;
+  claude_doc_write: { path: string; size: number; mtime: number };
 }
 
 /** one entry of a folder listing (Files panel); ~/.ssh and Claude's secrets never appear */
@@ -250,6 +257,77 @@ export interface WinfsMount {
   client?: string | null;
 }
 
+/** The «Claude» screen (cclib/claudecfg.py). MCP: only name, type, command + package or URL host, env count. */
+export interface ClaudeDoc {
+  scope: 'user' | 'project' | 'local' | 'parent';
+  path: string;
+  exists: boolean;
+  size: number;
+  mtime: number;
+}
+export interface ClaudeMemoryFile {
+  name: string;
+  path: string;
+  size: number;
+  mtime: number;
+  title?: string | null;
+  description?: string | null;
+  type?: string | null;
+}
+export interface ClaudeMemoryGroup {
+  dir: string;
+  label: string;
+  folder: string | null;
+  current: boolean;
+  files: ClaudeMemoryFile[];
+}
+export interface ClaudeMcp {
+  name: string;
+  scope: 'user' | 'local' | 'project';
+  source: string;
+  type: string;
+  target: string;
+  env: number;
+}
+export interface ClaudeSkill {
+  name: string;
+  description: string;
+  scope: 'user' | 'project' | 'plugin';
+  plugin: string | null;
+  path: string;
+}
+export interface ClaudePlugin {
+  id: string;
+  name: string;
+  marketplace: string;
+  version: string;
+  scope: string;
+  enabled: boolean;
+  path: string | null;
+  updatedAt: string;
+}
+export interface ClaudeHook {
+  event: string;
+  matcher: string;
+  type: string;
+  command: string;
+  timeout: number | null;
+  async: boolean;
+  scope: 'user' | 'project' | 'plugin';
+  plugin: string | null;
+  source: string;
+}
+export interface ClaudeConfig {
+  folder: string | null;
+  root: string | null;
+  instructions: ClaudeDoc[];
+  memory: ClaudeMemoryGroup[];
+  mcp: ClaudeMcp[];
+  skills: ClaudeSkill[];
+  plugins: ClaudePlugin[];
+  hooks: ClaudeHook[];
+}
+
 /** Request timeouts (ms): 10 s, long ones 30–60 s (DESIGN §9 rpc.ts). */
 export function methodTimeout(m: Method): number {
   if (m === 'doctor' || m === 'usage') return 60_000;
@@ -267,6 +345,7 @@ export type ErrorCode =
   | 'chat_open'
   | 'not_allowed'
   | 'busy'
+  | 'conflict'
   | 'tmux_error'
   | 'timeout'
   | 'too_large'

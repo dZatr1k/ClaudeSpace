@@ -26,8 +26,8 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 if HERE not in sys.path:          # -I (isolated, safe-path) does not put the script dir on sys.path
     sys.path.insert(0, HERE)
 
-from cclib import (askpass, chats, doctor, files, gitview, netstat, paths, projects, search, sessions, system,  # noqa: E402
-                   tmux, turns, usage, winfs)
+from cclib import (askpass, chats, claudecfg, doctor, files, gitview, netstat, paths, projects, search,  # noqa: E402
+                   sessions, system, tmux, turns, usage, winfs)
 
 AGENT_VERSION = '0.2.0'
 PROTOCOL = 1
@@ -37,7 +37,8 @@ WINDOW_RE = re.compile(r'^[0-9]{1,4}$')
 SEARCH_ID_RE = re.compile(r'^[A-Za-z0-9_-]{1,32}$')
 SLOW = {'usage', 'doctor', 'system', 'project_preview', 'session_preview', 'mosh_list', 'mosh_kill_stale',
         'create_project', 'winfs_mount', 'winfs_unmount', 'pc_tunnel_status', 'askpass_enable',
-        'fs_list', 'fs_read', 'git_status', 'git_diff', 'git_log', 'claude_send'}
+        'fs_list', 'fs_read', 'git_status', 'git_diff', 'git_log', 'claude_send',
+        'claude_config', 'claude_doc_write'}
 TUNNEL_PORT = 2222
 CLAUDE_ACTION_RE = re.compile(r'^(interrupt|compact|clear|model)$')
 CLAUDE_MODEL_RE = re.compile(r'^(default|opus|sonnet|haiku|opusplan|sonnet\[1m\])$')
@@ -178,6 +179,7 @@ class Agent:
             'fs_download_source': self.m_fs_download_source,
             'git_status': self.m_git_status, 'git_diff': self.m_git_diff, 'git_log': self.m_git_log,
             'claude_send': self.m_claude_send,
+            'claude_config': self.m_claude_config, 'claude_doc_write': self.m_claude_doc_write,
         }
 
     # -------------------------------------------------------------- output
@@ -768,7 +770,7 @@ class Agent:
     def _wrap(fn, *a, **kw):
         try:
             return fn(*a, **kw)
-        except (files.FilesError, gitview.GitError) as e:
+        except (files.FilesError, gitview.GitError, claudecfg.CfgError) as e:
             raise AgentError(e.code, e.message)
 
     def m_fs_list(self, p):
@@ -794,6 +796,19 @@ class Agent:
     def m_git_log(self, p):
         d = self._wrap(files.resolve, p_str(p, 'path'), 'dir')
         return self._wrap(gitview.log, d, p_int(p, 'limit', 30, 1, 200))
+
+    # ---- the «Claude» screen: overview of instructions/memory/MCP/skills/plugins/hooks; edits of CLAUDE.md and memory
+    def m_claude_config(self, p):
+        ctx = p_str(p, 'path', required=False)
+        known = [d for d, _ in projects.project_dirs([c for c in chats.load_index() if not c.get('archived')])[0]]
+        return claudecfg.overview(ctx, known)
+
+    def m_claude_doc_write(self, p):
+        mtime = p.get('mtime')
+        if mtime is not None and (isinstance(mtime, bool) or not isinstance(mtime, int) or mtime < 0):
+            raise AgentError('bad_request', 'неверный mtime')
+        return self._wrap(claudecfg.write_doc, p_str(p, 'path'), p_str(p, 'text', max_len=claudecfg.MAX_DOC + 1,
+                                                                        required=False, default=''), mtime)
 
     # ---- sudo password prompts in the app (BACKLOG 11): main only; the password is never logged or echoed
     def _session_of_pane(self, pane):
