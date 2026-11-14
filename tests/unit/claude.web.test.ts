@@ -12,6 +12,7 @@ const { useConn } = await import('../../src/renderer/stores/conn');
 const { useData } = await import('../../src/renderer/stores/data');
 const { useTabs } = await import('../../src/renderer/stores/tabs');
 const { useUi } = await import('../../src/renderer/stores/ui');
+const { branchFromName } = await import('../../src/renderer/lib/branch');
 
 const CHAT = '11111111-1111-4111-8111-111111111111';
 const proc = (status: string): ClaudeProc => ({
@@ -102,5 +103,15 @@ describe('Claude quick actions', () => {
     claudeAction('compact');
     await new Promise((r) => setTimeout(r, 0));
     expect(useUi.getState().toasts.at(-1)?.text).toContain('Claude сейчас занят');
+  });
+});
+
+describe('task branch names', () => {
+  it('turns a task name into a branch git accepts', () => {
+    expect(branchFromName('Fix login')).toBe('fix-login');
+    expect(branchFromName('  feat/New  API!! ')).toBe('feat/new-api');
+    expect(branchFromName('Починить вход')).toBe('');
+    expect(branchFromName('--x..')).toBe('x');
+    expect(branchFromName('a'.repeat(80))).toHaveLength(60);
   });
 });

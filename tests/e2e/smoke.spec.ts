@@ -3,7 +3,7 @@
 // Needs an X display: DISPLAY (xvfb-run or an existing session). Screenshots go to docs/screenshots/.
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -182,6 +182,31 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await setTheme(win, 'light');
   await win.screenshot({ path: join(SHOTS, '17-git-light.png') });
   await setTheme(win, 'dark');
+  // a task in its own worktree (needs a first commit): created from the Git tab, listed, removed
+  const gitEnv = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'T',
+    GIT_AUTHOR_EMAIL: 't@example.com',
+    GIT_COMMITTER_NAME: 'T',
+    GIT_COMMITTER_EMAIL: 't@example.com',
+  };
+  execFileSync('git', ['-C', fh.alpha, 'add', '-A'], { env: gitEnv });
+  execFileSync('git', ['-C', fh.alpha, 'commit', '-qm', 'first'], { env: gitEnv });
+  await panel.getByRole('button', { name: 'Новая задача' }).click();
+  const taskDlg = win.getByRole('dialog');
+  await taskDlg.getByLabel('Что нужно сделать').fill('Fix login');
+  await expect(taskDlg).toContainText('.claude/worktrees/fix-login');
+  await taskDlg.getByLabel('Сразу открыть там новый чат').uncheck();
+  await win.screenshot({ path: join(SHOTS, '21-new-task.png') });
+  await taskDlg.getByRole('button', { name: 'Создать' }).click();
+  const tasks = panel.getByTestId('git-tasks');
+  await expect(tasks).toContainText('fix-login', { timeout: 10_000 });
+  await expect(tasks).toContainText('без правок');
+  expect(execFileSync('git', ['-C', fh.alpha, 'status', '--porcelain']).toString()).toBe('');
+  await win.screenshot({ path: join(SHOTS, '22-git-tasks.png') });
+  await tasks.getByRole('button', { name: 'Удалить задачу fix-login' }).click();
+  await win.getByRole('dialog').getByRole('button', { name: 'Удалить' }).click();
+  await expect(tasks).toBeHidden({ timeout: 10_000 });
   // upload from the PC: through main -> agent check -> SFTP; an existing name needs overwrite; ~/.ssh is refused
   const up = (dir: string, name: string, overwrite?: boolean) =>
     win.evaluate(

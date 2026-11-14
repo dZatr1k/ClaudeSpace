@@ -27,9 +27,9 @@ if HERE not in sys.path:          # -I (isolated, safe-path) does not put the sc
     sys.path.insert(0, HERE)
 
 from cclib import (askpass, chats, claudecfg, doctor, files, gitview, netstat, paths, projects, search,  # noqa: E402
-                   sessions, system, tmux, turns, usage, winfs)
+                   sessions, system, tmux, turns, usage, winfs, worktrees)
 
-AGENT_VERSION = '0.2.0'
+AGENT_VERSION = '0.3.0'
 PROTOCOL = 1
 MAX_FRAME = 4 * 1024 * 1024
 POLL = {'sessions': 1.0, 'tmux': 2.0, 'chats': 3.0, 'projects': 30.0, 'system': 10.0, 'winfs': 5.0, 'ports': 3.0, 'askpass': 2.0}
@@ -38,7 +38,7 @@ SEARCH_ID_RE = re.compile(r'^[A-Za-z0-9_-]{1,32}$')
 SLOW = {'usage', 'doctor', 'system', 'project_preview', 'session_preview', 'mosh_list', 'mosh_kill_stale',
         'create_project', 'winfs_mount', 'winfs_unmount', 'pc_tunnel_status', 'askpass_enable',
         'fs_list', 'fs_read', 'git_status', 'git_diff', 'git_log', 'claude_send',
-        'claude_config', 'claude_doc_write'}
+        'claude_config', 'claude_doc_write', 'git_worktrees', 'worktree_create', 'worktree_remove'}
 TUNNEL_PORT = 2222
 CLAUDE_ACTION_RE = re.compile(r'^(interrupt|compact|clear|model)$')
 CLAUDE_MODEL_RE = re.compile(r'^(default|opus|sonnet|haiku|opusplan|sonnet\[1m\])$')
@@ -179,6 +179,8 @@ class Agent:
             'fs_download_source': self.m_fs_download_source,
             'git_status': self.m_git_status, 'git_diff': self.m_git_diff, 'git_log': self.m_git_log,
             'claude_send': self.m_claude_send,
+            'git_worktrees': self.m_git_worktrees, 'worktree_create': self.m_worktree_create,
+            'worktree_remove': self.m_worktree_remove,
             'claude_config': self.m_claude_config, 'claude_doc_write': self.m_claude_doc_write,
         }
 
@@ -796,6 +798,24 @@ class Agent:
     def m_git_log(self, p):
         d = self._wrap(files.resolve, p_str(p, 'path'), 'dir')
         return self._wrap(gitview.log, d, p_int(p, 'limit', 30, 1, 200))
+
+    # ---- parallel tasks in git worktrees: list, create (branch + folder), remove (clean, no session inside)
+    def m_git_worktrees(self, p):
+        return self._wrap(worktrees.list_worktrees, self._wrap(files.resolve, p_str(p, 'path'), 'dir'))
+
+    def m_worktree_create(self, p):
+        d = self._wrap(files.resolve, p_str(p, 'path'), 'dir')
+        res = self._wrap(worktrees.create, d, p_str(p, 'branch', max_len=60), p_str(p, 'base', required=False,
+                                                                                     max_len=60))
+        self.soon('projects')
+        return res
+
+    def m_worktree_remove(self, p):
+        d = self._wrap(files.resolve, p_str(p, 'path'), 'dir')
+        res = self._wrap(worktrees.remove, d, p_str(p, 'worktree'), p_bool(p, 'force', False),
+                         p_bool(p, 'deleteBranch', False))
+        self.soon('projects')
+        return res
 
     # ---- the «Claude» screen: overview of instructions/memory/MCP/skills/plugins/hooks; edits of CLAUDE.md and memory
     def m_claude_config(self, p):

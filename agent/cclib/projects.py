@@ -44,10 +44,16 @@ def project_dirs(chats):
 HOME_NAME = 'home'  # the home folder is shown as a project named "home", not "~"
 
 
+WORKTREE_RE = re.compile(r'^(.+)/\.claude/worktrees/([^/]+)$')
+
+
 def display_name(d):
     P = paths.P
     if d == P.home:
         return HOME_NAME
+    m = WORKTREE_RE.match(d or '')
+    if m:   # a task worktree (cclib/worktrees.py): «Alpha › fix-login»
+        return f'{display_name(m.group(1))} › {m.group(2)}'
     return os.path.basename(d) if d.startswith(P.projects_root + '/') else paths.short_path(d)
 
 

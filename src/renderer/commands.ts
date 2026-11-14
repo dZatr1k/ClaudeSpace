@@ -3,6 +3,7 @@ import { defaultSettings } from '@shared/settings';
 import { CLAUDE_MODELS } from '@shared/protocol';
 import { activeClaude, canCommand, canInterrupt, claudeAction, setModel } from './lib/claude';
 import { pasteClipboardImage } from './lib/images';
+import { newTaskDialog } from './lib/worktrees';
 import { openClaudeScreen } from './components/Overlays/ClaudeScreen';
 import { invoke } from './bridge';
 import { t } from './i18n/ru';
@@ -267,6 +268,12 @@ export function getCommands(): Command[] {
             run: () => runAppCommand('lazygit.here'),
           },
           { id: 'vscode.here', title: `${t.actions.vscode}: «${here}»`, run: () => cwd && A.openVsCode(cwd) },
+          {
+            id: 'task.new',
+            title: `${t.worktrees.newTask}: «${here}»`,
+            needsVm: true,
+            run: () => cwd && newTaskDialog(cwd),
+          },
         ]
       : []),
     ...claudeCommands(),

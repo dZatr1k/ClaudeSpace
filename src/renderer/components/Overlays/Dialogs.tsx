@@ -7,6 +7,8 @@ import { matches, shortPath } from '../../lib/format';
 import { useData } from '../../stores/data';
 import type { Dialog, Toast } from '../../stores/ui';
 import { useUi } from '../../stores/ui';
+import { branchFromName } from '../../lib/branch';
+import { createTask } from '../../lib/worktrees';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 
@@ -251,6 +253,87 @@ function CreateProject() {
   );
 }
 
+function NewTask({ repo }: { repo: string }) {
+  const [name, setName] = useState('');
+  const [base, setBase] = useState('');
+  const [start, setStart] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const branch = branchFromName(name);
+  const submit = async () => {
+    if (!branch || busy) return;
+    setBusy(true);
+    const ok = await createTask(repo, branch, base.trim() || null, start);
+    setBusy(false);
+    if (ok) close();
+  };
+  return (
+    <Modal
+      open
+      onClose={close}
+      title={t.worktrees.dialogTitle}
+      width={520}
+      footer={
+        <>
+          <Button onClick={close}>{t.actions.cancel}</Button>
+          <Button variant="primary" disabled={!branch || busy} onClick={() => void submit()}>
+            {busy ? t.worktrees.creating : t.actions.create}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-[12px] leading-relaxed text-muted">
+          {t.worktrees.dialogHint(shortPath(repo, useData.getState().hello?.home ?? null))}
+        </p>
+        <label htmlFor="cs-task-name" className="block text-[12px] text-muted">
+          {t.worktrees.name}
+        </label>
+        <input
+          id="cs-task-name"
+          autoFocus
+          className={inputCls}
+          value={name}
+          placeholder={t.worktrees.namePh}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && void submit()}
+        />
+        <div className="text-[12px] text-faint">
+          {branch ? (
+            <>
+              {t.worktrees.branchWillBe} <span className="mono text-muted">{branch}</span>
+              {', '}
+              {t.worktrees.folderWillBe}{' '}
+              <span className="mono text-muted">.claude/worktrees/{branch.replace(/\//g, '-')}</span>
+            </>
+          ) : (
+            t.worktrees.nameRule
+          )}
+        </div>
+        <label htmlFor="cs-task-base" className="block text-[12px] text-muted">
+          {t.worktrees.base}
+        </label>
+        <input
+          id="cs-task-base"
+          className={`${inputCls} font-mono text-[12px]`}
+          value={base}
+          placeholder={t.worktrees.basePh}
+          onChange={(e) => setBase(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && void submit()}
+        />
+        <label className="flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            checked={start}
+            onChange={(e) => setStart(e.target.checked)}
+            className="accent-[var(--accent)]"
+          />
+          {t.worktrees.startClaude}
+        </label>
+      </div>
+    </Modal>
+  );
+}
+
 function Clone() {
   const home = useData((d) => d.hello?.home ?? '~');
   const [url, setUrl] = useState('');
@@ -380,6 +463,8 @@ export function Dialogs() {
       return <NewChat />;
     case 'createProject':
       return <CreateProject />;
+    case 'newTask':
+      return <NewTask repo={d.repo} />;
     case 'clone':
       return <Clone />;
     case 'paste':

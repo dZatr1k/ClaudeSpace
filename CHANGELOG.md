@@ -11,6 +11,10 @@
 - Claude settings screen (the Claude button in the title bar): edit CLAUDE.md files and memory notes, see MCP
   servers, skills, plugins and hooks. MCP keys and full server commands stay on the VM. A save never overwrites
   a file that changed on the VM while you were editing it.
+- Tasks in separate folders: Git tab → New task creates a branch in its own git worktree
+  (`.claude/worktrees/<name>` inside the repo) and opens a new chat there, so a second Claude works without
+  touching the main checkout. The Git tab lists the tasks with their changes and removes finished ones (only
+  clean ones, or after a warning; the branch is deleted only if it is merged).
 - Two ClaudeSpace copies on one VM (say, a dev build and the installed app) no longer unmount each other's PC disk
   on exit.
 

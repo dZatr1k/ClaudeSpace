@@ -38,6 +38,7 @@ export type Dialog =
   | { kind: 'info'; title: string; body?: string }
   | { kind: 'newChat' }
   | { kind: 'createProject'; path?: string }
+  | { kind: 'newTask'; repo: string }
   | { kind: 'clone' }
   | { kind: 'paste'; text: string; onConfirm: () => void };
 

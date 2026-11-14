@@ -114,6 +114,14 @@ export const methodSchemas = {
     .strict(),
   git_log: z.object({ path, limit: z.number().int().min(1).max(200).optional() }).strict(),
   // quick actions for a running chat: a fixed command typed into its Claude pane (no free text)
+  // parallel tasks in git worktrees (<main>/.claude/worktrees/<name>)
+  git_worktrees: z.object({ path }).strict(),
+  worktree_create: z
+    .object({ path, branch: z.string().min(1).max(60), base: z.string().min(1).max(60).optional() })
+    .strict(),
+  worktree_remove: z
+    .object({ path, worktree: path, force: z.boolean().optional(), deleteBranch: z.boolean().optional() })
+    .strict(),
   // the «Claude» screen: overview (secrets stay in the agent) and edits of CLAUDE.md / memory notes only
   claude_config: z.object({ path: path.optional() }).strict(),
   claude_doc_write: z
@@ -184,6 +192,15 @@ export interface MethodResults {
   git_log: { root: string | null; commits: GitCommit[] };
   claude_send: { pane: string; status: string };
   claude_config: ClaudeConfig;
+  git_worktrees: { main: string; current: string | null; worktrees: GitWorktree[] };
+  worktree_create: { path: string; branch: string; base: string | null; created: boolean };
+  worktree_remove: {
+    path: string;
+    removed: boolean;
+    branch: string | null;
+    branchDeleted: boolean;
+    branchKept?: string;
+  };
   claude_doc_write: { path: string; size: number; mtime: number };
 }
 
@@ -255,6 +272,19 @@ export interface WinfsMount {
   src: string;
   owned: boolean;
   client?: string | null;
+}
+
+/** a linked worktree of a repo (not the main checkout); ours = under .claude/worktrees; dirty = changed files */
+export interface GitWorktree {
+  path: string;
+  head: string | null;
+  branch: string | null;
+  detached: boolean;
+  locked: boolean;
+  prunable: boolean;
+  dirty: number | null;
+  sessions: string[];
+  ours: boolean;
 }
 
 /** The «Claude» screen (cclib/claudecfg.py). MCP: only name, type, command + package or URL host, env count. */
@@ -333,7 +363,14 @@ export function methodTimeout(m: Method): number {
   if (m === 'doctor' || m === 'usage') return 60_000;
   if (m === 'winfs_mount') return 45_000;
   if (m === 'winfs_unmount') return 20_000;
-  if (m === 'list_projects' || m === 'project_preview' || m === 'create_project' || m === 'system')
+  if (
+    m === 'list_projects' ||
+    m === 'project_preview' ||
+    m === 'create_project' ||
+    m === 'system' ||
+    m === 'worktree_create' ||
+    m === 'worktree_remove'
+  )
     return 30_000;
   return 10_000;
 }
@@ -346,6 +383,7 @@ export type ErrorCode =
   | 'not_allowed'
   | 'busy'
   | 'conflict'
+  | 'dirty'
   | 'tmux_error'
   | 'timeout'
   | 'too_large'
