@@ -72,6 +72,7 @@ export const ipcSchemas = {
   'launch.openExternal': z.object({ url: z.string().url().max(4096) }).strict(),
   'app.info': z.undefined(),
   'app.toggleFullscreen': z.undefined(),
+  'app.splash': z.object({ on: z.boolean() }).strict(),
   'app.toggleDevTools': z.undefined(),
   'pclink.state': z.undefined(),
   'pclink.mount': z.object({ dst: z.string().min(1).max(1024) }).strict(),
@@ -161,6 +162,8 @@ export interface IpcContract {
   'launch.openExternal': { args: { url: string }; result: void };
   'app.info': { args: undefined; result: AppInfo };
   'app.toggleFullscreen': { args: undefined; result: void };
+  /** startup splash shown/hidden: the caption buttons take its background colour */
+  'app.splash': { args: { on: boolean }; result: void };
   'app.toggleDevTools': { args: undefined; result: void };
   'pclink.state': { args: undefined; result: PcLinkState };
   'pclink.mount': { args: { dst: string }; result: { ok: boolean; error?: string } };

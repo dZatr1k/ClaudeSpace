@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+- Startup splash: the app shows the connection stages (settings, login, agent) while it connects to the VM
+  instead of an empty window saying "no connection"; retry or open offline if the VM does not answer.
+
 ## 0.3.0
 - UI redesign: warm graphite palette with an orange accent, new start screen, unified connection and
   terminal state cards, clearer copy, better contrast in both themes (ANSI colors included).

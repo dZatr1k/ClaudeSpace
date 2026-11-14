@@ -178,9 +178,12 @@ function effectiveDark(): boolean {
   return t === 'system' ? nativeTheme.shouldUseDarkColors : t === 'dark';
 }
 
+/** the renderer's startup splash is up (window.ts: caption buttons match its background) */
+let splashOn = true;
+
 function applyTheme() {
   nativeTheme.themeSource = store.settings.appearance.theme;
-  if (win) setOverlayTheme(win, effectiveDark());
+  if (win) setOverlayTheme(win, effectiveDark(), splashOn);
   send('theme.dark', effectiveDark());
 }
 
@@ -309,6 +312,10 @@ const handlers: Handlers = {
     protocol: PROTOCOL,
     userData,
   }),
+  'app.splash': ({ on }) => {
+    splashOn = on;
+    if (win) setOverlayTheme(win, effectiveDark(), on);
+  },
   'app.toggleFullscreen': () => {
     if (win) win.setFullScreen(!win.isFullScreen());
   },

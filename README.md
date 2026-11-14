@@ -54,4 +54,9 @@ npm test           # агент (python) + vitest
 Оттуда взяты только идеи. Код не копировался: у этих проектов лицензии AGPL-3.0 и PolyForm Noncommercial, они
 несовместимы с MIT.
 
+Анимация шестерён на загрузочном экране основана на
+[«fresh-panther-41»](https://github.com/uiverse-io/galaxy/blob/main/loaders/Nawsome_fresh-panther-41.html)
+автора Nawsome с Uiverse.io (MIT, [uiverse-io/galaxy](https://github.com/uiverse-io/galaxy)): геометрия сохранена,
+цвета и состояния переделаны (`src/renderer/splash/gearbox.css`).
+
 ClaudeSpace — независимый проект, не связанный с Anthropic.

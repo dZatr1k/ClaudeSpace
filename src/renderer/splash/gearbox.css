@@ -1,0 +1,174 @@
+/* Gearbox loader, adapted from Uiverse.io by Nawsome ("fresh-panther-41"), MIT License,
+   https://github.com/uiverse-io/galaxy. Geometry kept; colours moved to tokens, both themes. */
+.cs-gearbox {
+  --gb-bg: #141312; /* box and gear hubs */
+  --gb-gear: #4f4a44; /* gear body */
+  --gb-edge: rgb(255 255 255 / 0.1);
+  --gb-hi: #8a837a; /* top highlight */
+  --gb-lo: #000; /* bottom shadow */
+  --gb-hub-in: #0a0909;
+  --gb-vignette: rgb(0 0 0 / 0.9);
+  --gb-speed: 3s;
+
+  position: relative;
+  width: 200px;
+  height: 150px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--gb-bg);
+  box-shadow: 0 0 0 1px var(--gb-edge);
+}
+[data-theme='light'] .cs-gearbox {
+  --gb-bg: #ebe7e2;
+  --gb-gear: #c9c2b9;
+  --gb-edge: rgb(60 40 20 / 0.12);
+  --gb-hi: #fff;
+  --gb-lo: rgb(60 40 20 / 0.35);
+  --gb-hub-in: #d6d0c8;
+  --gb-vignette: rgb(60 40 20 / 0.22);
+}
+/* the big gear in the accent colour */
+.cs-gearbox.has-accent .cs-gear.is-large {
+  --gb-gear: var(--accent);
+}
+
+.cs-gearbox__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: 6px;
+  box-shadow: inset 0 0 20px var(--gb-vignette);
+  pointer-events: none;
+}
+
+.cs-gear {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  border-radius: 30px;
+  box-shadow:
+    0 -1px 0 0 var(--gb-hi),
+    0 1px 0 0 var(--gb-lo);
+}
+.cs-gear.is-large {
+  width: 120px;
+  height: 120px;
+  border-radius: 60px;
+}
+.cs-gear--one {
+  top: 12px;
+  left: 10px;
+}
+.cs-gear--two {
+  top: 61px;
+  left: 60px;
+}
+.cs-gear--three {
+  top: 110px;
+  left: 10px;
+}
+.cs-gear--four {
+  top: 13px;
+  left: 128px;
+}
+
+/* hub */
+.cs-gear::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border-radius: 36px;
+  background: var(--gb-bg);
+  box-shadow:
+    0 0 10px var(--gb-edge),
+    inset 0 0 10px rgb(0 0 0 / 0.1),
+    inset 0 2px 0 0 var(--gb-hub-in),
+    inset 0 -1px 0 0 var(--gb-hi);
+}
+.cs-gear.is-large::after {
+  width: 96px;
+  height: 96px;
+  margin: -48px 0 0 -48px;
+  border-radius: 48px;
+}
+
+.cs-gear__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 30px;
+  border: 1px solid var(--gb-edge);
+  background: var(--gb-gear);
+  animation: cs-gb-ccw var(--gb-speed) linear infinite;
+}
+.cs-gear.is-large .cs-gear__inner {
+  border-radius: 60px;
+  animation-duration: calc(var(--gb-speed) * 2);
+}
+.cs-gear--two .cs-gear__inner {
+  animation-name: cs-gb-cw;
+}
+
+.cs-gear__bar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 76px;
+  height: 16px;
+  margin: -8px 0 0 -38px;
+  border-radius: 2px;
+  border-inline: 1px solid var(--gb-edge);
+  background: var(--gb-gear);
+}
+.cs-gear.is-large .cs-gear__bar {
+  width: 136px;
+  margin-left: -68px;
+}
+.cs-gear__bar:nth-child(2) {
+  transform: rotate(60deg);
+}
+.cs-gear__bar:nth-child(3) {
+  transform: rotate(120deg);
+}
+.cs-gear__bar:nth-child(4) {
+  transform: rotate(90deg);
+}
+.cs-gear__bar:nth-child(5) {
+  transform: rotate(30deg);
+}
+.cs-gear__bar:nth-child(6) {
+  transform: rotate(150deg);
+}
+
+/* states */
+.cs-gearbox.is-paused .cs-gear__inner {
+  animation-play-state: paused;
+}
+.cs-gearbox.is-paused {
+  opacity: 0.55;
+  transition: opacity 300ms;
+}
+.cs-gearbox.is-done .cs-gear__inner {
+  animation-play-state: paused;
+}
+
+@keyframes cs-gb-cw {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes cs-gb-ccw {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cs-gear__inner {
+    animation: none;
+  }
+}

@@ -1,0 +1,157 @@
+/* Preview chrome only (not shipped). */
+.pv {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--bg-base);
+}
+body:has(.pv-stage.is-sized) .pv {
+  background: repeating-conic-gradient(var(--bg-surface) 0 25%, var(--bg-base) 0 50%) 0 0 / 24px 24px;
+}
+.pv-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transform: translateZ(0); /* contains the splash's position: fixed */
+}
+.pv-stage.is-sized {
+  position: relative;
+  inset: auto;
+  max-width: 100%;
+  max-height: 100%;
+  box-shadow: var(--shadow-modal);
+  border-radius: 8px;
+}
+/* mimics Electron's titleBarOverlay (window.ts): 36 px, surface colour, ~138 px of caption buttons */
+.pv-titlebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 60;
+  height: 36px;
+  display: flex;
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 11px;
+}
+.pv-titlebar__btn {
+  width: 46px;
+  display: grid;
+  place-items: center;
+}
+.pv-app {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.pv-app button {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.pv-panel {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 100;
+  width: 260px;
+  max-height: calc(100vh - 60px);
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-pop);
+  font-size: 12px;
+}
+.pv-hide .pv-panel {
+  display: none;
+}
+.pv-panel__title {
+  font-weight: 600;
+}
+.pv-panel button {
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.pv-panel button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.pv-panel button.is-on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.pv-panel .pv-play {
+  padding: 6px 8px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 500;
+}
+.pv-panel .pv-play:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+  filter: brightness(1.08);
+}
+.pv-group,
+.pv-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.pv-row > span {
+  width: 40px;
+  color: var(--text-faint);
+}
+.pv-check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--text-muted);
+}
+.pv-hint {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.pv-knobs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--bg-surface);
+}
+.pv-knobs > button {
+  align-self: flex-start;
+}
+.pv-knob {
+  display: grid;
+  grid-template-columns: 70px 1fr 44px;
+  gap: 6px;
+  align-items: center;
+  color: var(--text-muted);
+}
+.pv-knob input {
+  accent-color: var(--accent);
+  min-width: 0;
+}
+.pv-knob code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  text-align: right;
+}

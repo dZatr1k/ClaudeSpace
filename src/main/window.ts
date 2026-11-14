@@ -60,11 +60,7 @@ export function createWindow(opts: {
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: dark ? '#191816' : '#F3F1EE',
-      symbolColor: dark ? '#EDE9E4' : '#1D1B19',
-      height: 36,
-    },
+    titleBarOverlay: overlay(dark, true), // the renderer starts with the splash
     backgroundColor: dark ? '#121110' : '#FBFAF8',
     title: 'ClaudeSpace',
     webPreferences: {
@@ -94,13 +90,15 @@ export function rendererEntry(win: BrowserWindow): Promise<void> {
   return win.loadFile(join(__dirname, '../renderer/index.html'));
 }
 
-export function setOverlayTheme(win: BrowserWindow, dark: boolean): void {
+/** caption buttons (Windows): title bar colour, or the page background while the startup splash covers it */
+function overlay(dark: boolean, splash: boolean) {
+  const bg = splash ? (dark ? '#121110' : '#FBFAF8') : dark ? '#191816' : '#F3F1EE';
+  return { color: bg, symbolColor: dark ? '#EDE9E4' : '#1D1B19', height: 36 };
+}
+
+export function setOverlayTheme(win: BrowserWindow, dark: boolean, splash = false): void {
   try {
-    win.setTitleBarOverlay({
-      color: dark ? '#191816' : '#F3F1EE',
-      symbolColor: dark ? '#EDE9E4' : '#1D1B19',
-      height: 36,
-    });
+    win.setTitleBarOverlay(overlay(dark, splash));
   } catch {
     /* not supported on this platform */
   }

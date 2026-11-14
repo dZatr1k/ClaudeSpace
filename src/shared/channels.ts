@@ -30,6 +30,7 @@ export const IPC_CHANNEL_NAMES = [
   'launch.openExternal',
   'app.info',
   'app.toggleFullscreen',
+  'app.splash',
   'app.toggleDevTools',
   'pclink.state',
   'pclink.mount',

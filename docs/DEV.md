@@ -21,6 +21,12 @@ npm run dev:vm              # на этой VM (Electron с --no-sandbox, см. 
 Почему `--no-sandbox` на VM: Electron требует setuid-root `chrome-sandbox` или user namespaces; на Ubuntu 24.04
 непривилегированные userns запрещены AppArmor, а sudo мы не используем. В коде окна `sandbox: true` остаётся.
 
+## Загрузочный экран отдельно от приложения
+`npm run splash` поднимает Vite на `127.0.0.1:5180` (порт меняет `SPLASH_PORT`) со страницей
+`src/renderer/splash/preview.html`. Слева сам экран (`Splash.tsx` + `splash.css`, правки видны сразу), справа панель:
+прогон подключения, отдельные состояния, тема, размер окна. Состояние хранится в адресе (`?s=offline&theme=light`),
+так что ссылка воспроизводит вид. В сборку приложения страница не попадает.
+
 ## Тесты
 
 | Команда | Что | Сколько |

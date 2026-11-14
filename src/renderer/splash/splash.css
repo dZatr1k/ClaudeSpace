@@ -1,0 +1,326 @@
+/* Startup splash. Colours come from theme/tokens.css; the knobs below are the ones worth tuning. */
+.cs-splash {
+  --splash-mark: 44px; /* diamond size */
+  --splash-width: 320px; /* column width (steps, texts) */
+  --splash-bar: 3px; /* step bar thickness */
+  --splash-gap: 6px; /* gap between step bars */
+  --splash-fade: 280ms; /* fade-out once connected */
+
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-base);
+  color: var(--text);
+  font-family: var(--font-sans);
+  transition:
+    opacity var(--splash-fade) ease-out,
+    transform var(--splash-fade) ease-out;
+}
+.cs-splash.is-leaving {
+  opacity: 0;
+  transform: scale(1.01);
+  pointer-events: none;
+}
+
+/* the window has no native frame: keep the top strip draggable, buttons (titleBarOverlay) live there */
+.cs-splash__drag {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 36px;
+  -webkit-app-region: drag;
+}
+
+.cs-splash__body {
+  width: min(var(--splash-width), calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-top: -6vh; /* optical centre */
+}
+
+/* ---- mark */
+.cs-splash__mark {
+  position: relative;
+  width: calc(var(--splash-mark) * 1.8);
+  height: calc(var(--splash-mark) * 1.8);
+  display: grid;
+  place-items: center;
+}
+.cs-splash__diamond {
+  font-size: var(--splash-mark);
+  line-height: 1;
+  color: var(--accent);
+  animation: cs-splash-breathe 2.4s ease-in-out infinite;
+}
+.cs-splash__ring {
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  animation: cs-splash-ripple 2.4s ease-out infinite;
+}
+.is-offline .cs-splash__diamond {
+  color: var(--text-faint);
+  animation: none;
+}
+.is-offline .cs-splash__ring,
+.is-done .cs-splash__ring {
+  animation: none;
+}
+.is-done .cs-splash__diamond {
+  animation: cs-splash-pop 320ms ease-out;
+}
+
+/* gears: the Gearbox is 200×150; each placement scales it (--gs) and reserves the scaled box */
+.cs-splash__gears {
+  --gs: 1;
+  position: relative;
+  width: calc(200px * var(--gs));
+  height: calc(150px * var(--gs));
+  flex: none;
+}
+.cs-splash__gears > .cs-gearbox {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: scale(var(--gs));
+  transform-origin: top left;
+}
+.cs-splash__gears.is-below {
+  --gs: 0.5;
+  margin-top: 22px;
+}
+.cs-splash__gears.is-below + .cs-splash__headline {
+  margin-top: 14px;
+}
+.cs-splash__gears.is-inline {
+  --gs: 0.2;
+  display: inline-block;
+  vertical-align: -9px;
+  margin-right: 8px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+/* a big faint gearbox behind the logo, no frame */
+.cs-splash__gears.is-behind {
+  /* knobs (the preview sets them on a parent, so defaults live in the var() fallbacks) */
+  --gs: var(--splash-gears-size, 2.5);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  opacity: var(--splash-gears-opacity, 0.1);
+  pointer-events: none;
+  mask-image: radial-gradient(closest-side, #000 var(--splash-gears-fade, 0%), transparent);
+}
+.cs-splash__gears.is-behind .cs-gearbox {
+  --gb-speed: var(--splash-gears-speed, 12s);
+  background: transparent;
+  box-shadow: none;
+}
+.cs-splash__gears.is-behind .cs-gearbox__overlay,
+.cs-splash__gears.is-behind .cs-gear::after {
+  display: none;
+}
+.cs-splash__name {
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.cs-splash__headline {
+  margin-top: 28px;
+  min-height: 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.is-offline .cs-splash__headline {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ---- steps */
+.cs-splash__steps {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--splash-gap);
+}
+.cs-splash__step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cs-splash__bar {
+  position: relative;
+  height: var(--splash-bar);
+  border-radius: var(--splash-bar);
+  background: var(--border-strong);
+  overflow: hidden;
+}
+.cs-splash__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 240ms ease-out;
+}
+.is-done .cs-splash__bar::after,
+.cs-splash__step.is-done .cs-splash__bar::after {
+  transform: scaleX(1);
+}
+.cs-splash__step.is-active .cs-splash__bar::after {
+  transform: scaleX(0.35);
+  animation: cs-splash-scan 1.2s ease-in-out infinite;
+}
+.cs-splash__step.is-failed .cs-splash__bar::after {
+  transform: scaleX(1);
+  background: var(--st-error);
+}
+.cs-splash__label {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: left;
+}
+.cs-splash__step.is-active .cs-splash__label,
+.cs-splash__step.is-done .cs-splash__label {
+  color: var(--text-muted);
+}
+.cs-splash__step.is-failed .cs-splash__label {
+  color: var(--st-error);
+}
+
+/* ---- meta line */
+.cs-splash__meta {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.cs-splash__meta > * + *::before {
+  content: '·';
+  margin-right: 10px;
+}
+.cs-splash__clock {
+  font-variant-numeric: tabular-nums;
+}
+
+.cs-splash__hint {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+  animation: cs-splash-in 300ms ease-out;
+}
+
+/* ---- offline */
+.cs-splash__offline {
+  margin-top: 18px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: cs-splash-in 240ms ease-out;
+}
+.cs-splash__error {
+  max-width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--st-error);
+  overflow-wrap: anywhere;
+}
+.cs-splash__retry {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.cs-splash__actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+.cs-splash__btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-control);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cs-splash__btn:hover {
+  background: var(--bg-hover);
+}
+.cs-splash__btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.cs-splash__btn.is-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 500;
+}
+.cs-splash__btn.is-primary:hover {
+  filter: brightness(1.08);
+}
+
+/* ---- motion */
+@keyframes cs-splash-breathe {
+  50% {
+    transform: scale(0.92);
+    opacity: 0.8;
+  }
+}
+@keyframes cs-splash-ripple {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+@keyframes cs-splash-scan {
+  0% {
+    transform: translateX(-35%) scaleX(0.35);
+  }
+  100% {
+    transform: translateX(100%) scaleX(0.35);
+  }
+}
+@keyframes cs-splash-pop {
+  40% {
+    transform: scale(1.18);
+  }
+}
+@keyframes cs-splash-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cs-splash *,
+  .cs-splash {
+    animation: none !important;
+    transition: none !important;
+  }
+}
