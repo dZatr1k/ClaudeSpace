@@ -60,8 +60,13 @@ def _main(d):
 
 
 def _sessions_in(folder):
-    return [s['name'] for s in tmux.sessions()
-            if s.get('path') and (s['path'] == folder or s['path'].startswith(folder + os.sep))]
+    """tmux sessions with any pane working inside folder (not only the active pane)."""
+    names = []
+    for name, path in tmux.pane_paths():
+        rp = os.path.realpath(path)
+        if (rp == folder or rp.startswith(folder + os.sep)) and name not in names:
+            names.append(name)
+    return names
 
 
 def _dirty(folder):

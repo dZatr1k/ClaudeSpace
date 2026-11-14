@@ -80,6 +80,16 @@ def send_keys(pane, *keys, literal=False):
     run(['send-keys', '-t', pane] + (['-l'] if literal else []) + list(keys), check=True)
 
 
+def pane_paths():
+    """[(session name, pane current path)] for every pane of every session."""
+    out = []
+    for line in run(['list-panes', '-a', '-F', '#{session_name}\t#{pane_current_path}']).splitlines():
+        f = line.split('\t')
+        if len(f) == 2 and f[1]:
+            out.append((f[0], f[1]))
+    return out
+
+
 def has_session(name):
     if not NAME_RE.match(name or ''):
         return False

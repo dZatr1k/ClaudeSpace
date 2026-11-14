@@ -70,11 +70,12 @@ class WorktreeTest(unittest.TestCase):
             f.write('x\n')
         self.assertEqual(self.err('worktree_remove', {'path': self.repo, 'worktree': wt}), 'dirty')
         # a tmux session working inside: refused even with force
-        fx.tmux('new-session', '-d', '-s', 'wt', '-c', wt, 'sleep 60')
+        sess = self.ok('new_session', {'cwd': wt})['session']
         try:
+            self.assertEqual(self.ok('git_worktrees', {'path': self.repo})['worktrees'][0]['sessions'], [sess])
             self.assertEqual(self.err('worktree_remove', {'path': self.repo, 'worktree': wt, 'force': True}), 'busy')
         finally:
-            fx.tmux('kill-session', '-t', '=wt')
+            self.ok('kill_session', {'session': sess})
         # never the main checkout or a random folder
         self.assertEqual(self.err('worktree_remove', {'path': self.repo, 'worktree': self.repo}), 'not_found')
         self.assertEqual(self.err('worktree_remove', {'path': self.repo, 'worktree': self.fh.beta}), 'not_found')
