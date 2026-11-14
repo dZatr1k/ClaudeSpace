@@ -104,7 +104,17 @@ const updater = new Updater({
   current: app.getVersion(),
   settings: () => store.settings,
   log,
-  load: async () => (await import('electron-updater')).autoUpdater as unknown as UpdaterLike,
+  // electron-updater is CommonJS with `autoUpdater` as a lazy getter: an ESM import does not see it as a named
+  // export (it is undefined there) — take it from the CJS module object instead
+  load: async () => {
+    const m = (await import('electron-updater')) as unknown as {
+      autoUpdater?: UpdaterLike;
+      default?: { autoUpdater?: UpdaterLike };
+    };
+    const u = m.autoUpdater ?? m.default?.autoUpdater;
+    if (!u) throw new Error('electron-updater: autoUpdater not found');
+    return u;
+  },
   beforeInstall: () => cleanupForQuit(),
   installFailed: () => {
     app.relaunch();

@@ -95,6 +95,7 @@ export class Updater extends EventEmitter {
     }
     try {
       this.u = await this.deps.load();
+      if (!this.u) throw new Error('updater module is empty');
     } catch (e) {
       this.deps.log('[update] electron-updater failed to load:', (e as Error).message);
       this.set({ status: 'error', error: updateErrorText(e) });
