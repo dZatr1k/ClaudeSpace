@@ -102,6 +102,12 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await win.keyboard.type('echo привет ─│┌ ✻');
   await expect(win.locator('.xterm-rows').first()).toContainText('привет ─│┌ ✻', { timeout: 5000 });
   await win.screenshot({ path: join(SHOTS, '04-terminal.png') });
+  // BACKLOG 6: the WebGL glyph check ran (Linux default is WebGL) and, with correct glyphs here, kept WebGL
+  await expect
+    .poll(() => readFileSync(join(ud, 'logs', 'main.log'), 'utf8').match(/\[webgl-probe\] (.*)/)?.[1] ?? '', {
+      timeout: 10_000,
+    })
+    .toMatch(/"ok":true/);
   // narrow window (minimum size): the right panel hides itself, the tab strip and the status bar must still fit
   await win.setViewportSize({ width: 960, height: 600 });
   await win.waitForTimeout(300);

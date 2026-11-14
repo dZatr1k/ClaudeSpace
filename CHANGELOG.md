@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- WebGL terminal renderer checks itself: if glyphs come out much narrower than they should (a GPU issue seen on
+  Windows), the terminal switches to the DOM renderer and says so.
+
 ## 0.6.1
 - Same features as 0.6.0, which was not published: its build stopped on a failing test.
 - Removing a task checks every tmux pane for work inside its folder, not only the active one.

@@ -6,6 +6,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { probeWebgl } from '../../lib/webglProbe';
 import { ClipboardAddon } from '@xterm/addon-clipboard';
 import type { Tab } from '@shared/model';
 import type { Settings } from '@shared/settings';
@@ -15,6 +16,7 @@ import { openLink } from '../../lib/ports';
 import { useConn } from '../../stores/conn';
 import { useData } from '../../stores/data';
 import { useUi } from '../../stores/ui';
+import { t } from '../../i18n/ru';
 import { terminalFontFamily, terminalTheme } from '../../theme/terminalThemes';
 
 export interface TermHandle {
@@ -137,9 +139,38 @@ function hidePointerWhileTyping(el: HTMLElement | undefined): void {
   el.addEventListener('mousemove', () => el.classList.remove('cs-typing'));
 }
 
-/** WebGL or the built-in DOM renderer, per settings; switching works on a live terminal. */
+/** once per run: does WebGL draw glyphs at the right size on this GPU? (lib/webglProbe.ts, BACKLOG 6) */
+let probe: Promise<boolean> | null = null;
+let probePassed = false;
+/** the probe failed and the setting was switched to DOM: choosing WebGL again after that is the user's call */
+let probeOverridable = false;
+
+function webglChecked(): boolean {
+  if (probePassed || probeOverridable) return true;
+  if (!probe) {
+    probe = probeWebgl(termOptions()).then((r) => {
+      void invoke('diag.log', { text: `[webgl-probe] ${JSON.stringify(r)}` });
+      if (r.ok) {
+        probePassed = true;
+        for (const x of handles.values()) syncRenderer(x);
+        return true;
+      }
+      const ui = useUi.getState();
+      void invoke('settings.set', { terminal: { renderer: 'dom' } }).then((next) => {
+        ui.set({ settings: next });
+        probeOverridable = true;
+      });
+      ui.toast(t.settings.webglBroken(Math.round((r.ratio ?? 0) * 100)), 'info', undefined, 10_000);
+      return false;
+    });
+  }
+  return false;
+}
+
+/** WebGL or the built-in DOM renderer, per settings; switching works on a live terminal. WebGL is attached only
+ * after the probe passed; until then (and if it fails) the DOM renderer draws. */
 function syncRenderer(h: TermHandle): void {
-  const want = (settings()?.terminal.renderer ?? 'webgl') === 'webgl';
+  const want = (settings()?.terminal.renderer ?? 'webgl') === 'webgl' && webglChecked();
   if (!want && h.webgl) {
     h.webgl.dispose();
     h.webgl = null;
