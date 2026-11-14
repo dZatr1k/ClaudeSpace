@@ -16,6 +16,9 @@ import { LocalTransport } from './transport/local';
 import { connectSsh, SshConnectError } from './transport/ssh';
 import type { Transport } from './transport/types';
 
+const SSH_NOISE =
+  /CHANNEL_DATA|CHANNEL_EXTENDED_DATA|CHANNEL_WINDOW_ADJUST|keepalive@openssh\.com|REQUEST_SUCCESS|REQUEST_FAILURE|GLOBAL_REQUEST \(keepalive/;
+
 export interface ConnectionDeps {
   settings: () => Settings;
   bundleDir: string;
@@ -339,7 +342,9 @@ export class Connection extends EventEmitter {
       keepaliveCountMax: 3,
       readyTimeout: 15000,
       debug: (m: string) => {
-        if (!/passphrase|privateKey|password/i.test(m)) this.log('[ssh]', m);
+        // per-packet chatter (terminal traffic, window adjusts, keepalives) filled ~1 MB of log per half hour
+        if (/passphrase|privateKey|password/i.test(m) || SSH_NOISE.test(m)) return;
+        this.log('[ssh]', m);
       },
     };
     const keyFp = key.state === 'plain' || key.state === 'decrypted' ? key.fingerprint : '';

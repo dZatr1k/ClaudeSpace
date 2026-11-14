@@ -72,7 +72,15 @@ export class Updater extends EventEmitter {
   }
 
   private set(p: Partial<UpdateState>) {
+    const prev = this.st.status;
     this.st = { ...this.st, ...p };
+    if (this.st.status !== prev && this.st.status !== 'downloading')
+      this.deps.log(
+        '[update] status',
+        this.st.status,
+        this.st.version ?? '',
+        this.st.error ? `error: ${this.st.error}` : '',
+      );
     this.emit('state', this.st);
   }
 
@@ -129,6 +137,7 @@ export class Updater extends EventEmitter {
       this.set({ status: 'error', error: updateErrorText(e), lastCheck: this.now(), percent: null });
     });
     const auto = () => this.deps.settings().updates.auto;
+    log('[update] ready, current', this.deps.current, 'auto-check', auto());
     this.timers.push(
       setTimeout(() => {
         if (auto()) void this.check();
