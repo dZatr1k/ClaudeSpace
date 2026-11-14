@@ -4,8 +4,10 @@
 - Unmount: `fusermount3 -u [-z] <dst>` for that one mount (`winfs -u` would unmount every ~/winfs/* mount,
   including ones the user made by hand).
 - Ownership: a mount is «ours» only if the agent mounted it; recorded in ~/.local/state/claudespace/winfs.json as
-  {dst: {mountId, pid}} — the kernel mount id makes a later manual mount on the same folder not ours. A mount that
-  existed before (manual `winfs`) is never unmounted automatically.
+  {dst: {mountId, pid, client}} — the kernel mount id makes a later manual mount on the same folder not ours. A mount
+  that existed before (manual `winfs`) is never unmounted automatically.
+- client: an id of the app installation that asked for the mount (BACKLOG 13). Another ClaudeSpace on the same VM (a
+  dev copy, a second PC) sees the mount as owned by someone else: it neither takes it over nor unmounts it on exit.
 - On EOF (the app's connection is gone) the agent lazily unmounts the mounts *it* (this pid) owns, so a dead tunnel
   never leaves a hanging sshfs behind; a newer agent that took a mount over (same mountId, its pid) keeps it.
 """
@@ -150,15 +152,27 @@ def _save_state(st):
     paths.atomic_write_json(state_path(), st)
 
 
+def _client(raw):
+    return raw if isinstance(raw, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', raw) else None
+
+
+def _mine(v, client):
+    """An owned state entry belongs to this client: same id, or either side has none (older app or agent)."""
+    other = v.get('client') if isinstance(v, dict) else None
+    return client is None or other is None or other == client
+
+
 def status():
-    """[{dst, src, owned}] for sshfs mounts in $HOME; forgets ownership of mounts that are gone."""
+    """[{dst, src, owned, client}] for sshfs mounts in $HOME; forgets ownership of mounts that are gone.
+    owned: mounted by some ClaudeSpace; client: which one (None for a mount from an older version)."""
     with LOCK:
         cur = sshfs_mounts()
         st = _load_state()
         keep = {d: v for d, v in st.items() if isinstance(v, dict) and d in cur and cur[d]['id'] == v.get('mountId')}
         if keep != st:
             _save_state(keep)
-        return [{'dst': d, 'src': m['src'], 'owned': d in keep} for d, m in sorted(cur.items())]
+        return [{'dst': d, 'src': m['src'], 'owned': d in keep, 'client': keep[d].get('client') if d in keep else None}
+                for d, m in sorted(cur.items())]
 
 
 def _run(argv, timeout):
@@ -177,21 +191,25 @@ def _last_line(r):
     return text[-1][:300] if text else f'код {r.returncode}'
 
 
-def mount(src_raw, dst_raw, pid=None):
-    """Mount (or take over our own earlier mount). -> {dst, src, owned, already}."""
+def mount(src_raw, dst_raw, pid=None, client=None):
+    """Mount (or take over our own earlier mount). -> {dst, src, owned, already, other}.
+    owned: ours (this client); other: mounted by another ClaudeSpace, left alone."""
     pid = os.getpid() if pid is None else pid
+    client = _client(client)
     src = norm_src(src_raw)
     with LOCK:
         dst = norm_dst(dst_raw)
         cur = sshfs_mounts()
         st = _load_state()
         if dst in cur:
-            mine = st.get(dst)
-            owned = isinstance(mine, dict) and mine.get('mountId') == cur[dst]['id']
-            if owned:      # a newer agent (reconnect) takes over the mount the previous one made
-                st[dst] = {'mountId': cur[dst]['id'], 'pid': pid}
+            v = st.get(dst)
+            app_owned = isinstance(v, dict) and v.get('mountId') == cur[dst]['id']
+            owned = app_owned and _mine(v, client)
+            if owned:      # a newer agent of the same app (reconnect) takes over the mount the previous one made
+                st[dst] = {'mountId': cur[dst]['id'], 'pid': pid, 'client': client or v.get('client')}
                 _save_state(st)
-            return {'dst': dst, 'src': cur[dst]['src'], 'owned': owned, 'already': True}
+            return {'dst': dst, 'src': cur[dst]['src'], 'owned': owned, 'already': True,
+                    'other': app_owned and not owned}
         if is_mounted(dst):
             raise WinfsError('exists', f'в {paths.short_path(dst)} уже подключено что-то другое')
         exe = winfs_path()
@@ -202,17 +220,19 @@ def mount(src_raw, dst_raw, pid=None):
         if dst not in cur:
             raise WinfsError('mount_failed', f'winfs: {_last_line(r)}')
         st = _load_state()
-        st[dst] = {'mountId': cur[dst]['id'], 'pid': pid}
+        st[dst] = {'mountId': cur[dst]['id'], 'pid': pid, 'client': client}
         _save_state(st)
-        return {'dst': dst, 'src': cur[dst]['src'], 'owned': True, 'already': False}
+        return {'dst': dst, 'src': cur[dst]['src'], 'owned': True, 'already': False, 'other': False}
 
 
 def _fusermount():
     return shutil.which('fusermount3') or shutil.which('fusermount')
 
 
-def unmount(dst_raw, only_owned=True, lazy=False):
-    """-> {dst, unmounted, skipped?: 'manual' | 'not_mounted'}."""
+def unmount(dst_raw, only_owned=True, lazy=False, client=None):
+    """-> {dst, unmounted, skipped?: 'manual' | 'other' | 'not_mounted'}.
+    only_owned: only a mount this client made (another ClaudeSpace's mount is skipped as 'other')."""
+    client = _client(client)
     with LOCK:
         dst = norm_dst(dst_raw, must_be_free=False)
         cur = sshfs_mounts()
@@ -223,6 +243,8 @@ def unmount(dst_raw, only_owned=True, lazy=False):
         owned = isinstance(mine, dict) and mine.get('mountId') == cur[dst]['id']
         if only_owned and not owned:
             return {'dst': dst, 'unmounted': False, 'skipped': 'manual'}
+        if only_owned and not _mine(mine, client):
+            return {'dst': dst, 'unmounted': False, 'skipped': 'other'}
         fm = _fusermount()
         if not fm:
             raise WinfsError('not_found', 'нет fusermount3 на VM')

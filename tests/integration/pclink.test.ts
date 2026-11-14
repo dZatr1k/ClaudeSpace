@@ -75,7 +75,7 @@ function settingsFor(port: number): Settings {
   return s;
 }
 
-async function online(settings: Settings, tunnelPort: number) {
+async function online(settings: Settings, tunnelPort: number, clientId?: string) {
   const conn = new Connection({
     settings: () => settings,
     bundleDir: BUNDLE,
@@ -89,6 +89,7 @@ async function online(settings: Settings, tunnelPort: number) {
   const link = new PcLink({
     conn,
     settings: () => settings,
+    clientId,
     pcPort: sshdPort,
     tunnelPort,
     retryMs: 300,
@@ -169,6 +170,22 @@ describe('reverse tunnel + Диск ПК', () => {
     await waitFor(() => !server.forwards.has(tport), 3000, 'unforwarded');
     conn.disconnect();
     await waitFor(() => link.state.tunnel === 'waiting', 3000, 'waiting');
+  });
+
+  it('a mount made by another ClaudeSpace on the same VM is shown, not taken over, not unmounted (BACKLOG 13)', async () => {
+    const pc = await online(settingsFor(server.port), await freePort(), 'pc-app');
+    await waitFor(() => pc.link.state.mounts[0]?.mounted, 15000, 'pc mounted');
+    expect(pc.link.state.mounts[0]).toMatchObject({ owned: true, other: false });
+    const dev = await online(settingsFor(server.port), await freePort(), 'dev-copy');
+    await waitFor(() => dev.link.state.mounts[0]?.mounted, 15000, 'dev sees it');
+    expect(dev.link.state.mounts[0]).toMatchObject({ owned: false, other: true });
+    await dev.link.shutdown();
+    dev.conn.disconnect();
+    await new Promise((r) => setTimeout(r, 500)); // the dev agent's EOF cleanup has run
+    expect(readFileSync(join(dir, 'mountinfo'), 'utf8')).toContain('winfs/V');
+    await pc.link.shutdown();
+    expect(readFileSync(join(dir, 'mountinfo'), 'utf8')).not.toContain('winfs/V');
+    pc.conn.disconnect();
   });
 
   it('port held by another tunnel: shows it, does not bind, takes over when it is gone', async () => {

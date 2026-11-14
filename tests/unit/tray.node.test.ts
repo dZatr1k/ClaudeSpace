@@ -27,6 +27,7 @@ describe('tray status lines', () => {
           label: 'V',
           mounted: true,
           owned: true,
+          other: false,
           busy: null,
           error: null,
         },

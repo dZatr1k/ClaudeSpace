@@ -28,6 +28,8 @@ const path = z
   .min(1)
   .max(4096)
   .refine((s) => !s.includes('\0'));
+/** id of one app installation (userData/client-id): whose «Диск ПК» mount it is (BACKLOG 13) */
+const clientId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const empty = z.object({}).strict();
 
 export const methodSchemas = {
@@ -64,9 +66,14 @@ export const methodSchemas = {
   resync: empty,
   // «Диск ПК» / reverse tunnel (BACKLOG 12): called by main (pclink.ts) only, not from the renderer
   winfs_status: empty,
-  winfs_mount: z.object({ src: z.string().min(1).max(260), dst: path }).strict(),
+  winfs_mount: z.object({ src: z.string().min(1).max(260), dst: path, client: clientId.optional() }).strict(),
   winfs_unmount: z
-    .object({ dst: path, onlyOwned: z.boolean().optional(), lazy: z.boolean().optional() })
+    .object({
+      dst: path,
+      onlyOwned: z.boolean().optional(),
+      lazy: z.boolean().optional(),
+      client: clientId.optional(),
+    })
     .strict(),
   pc_tunnel_status: z
     .object({ port: z.number().int().min(1024).max(65535).optional(), banner: z.boolean().optional() })
@@ -147,8 +154,8 @@ export interface MethodResults {
   mosh_kill_stale: { killed: number };
   resync: Record<string, never>;
   winfs_status: { mounts: WinfsMount[]; sshfs: boolean; winfs: boolean };
-  winfs_mount: { dst: string; src: string; owned: boolean; already: boolean };
-  winfs_unmount: { dst: string; unmounted: boolean; skipped?: 'manual' | 'not_mounted' };
+  winfs_mount: { dst: string; src: string; owned: boolean; already: boolean; other?: boolean };
+  winfs_unmount: { dst: string; unmounted: boolean; skipped?: 'manual' | 'other' | 'not_mounted' };
   pc_tunnel_status: { port: number; listening: boolean; banner: boolean | null };
   list_ports: { ports: VmPort[] };
   search_chats: { searchId: string };
@@ -225,11 +232,13 @@ export interface VmPort {
   projectPath: string | null;
 }
 
-/** an sshfs mount inside the VM home; owned = mounted by ClaudeSpace (agent), not by hand */
+/** an sshfs mount inside the VM home; owned = mounted by ClaudeSpace (agent), not by hand; client = which app
+ * installation mounted it (BACKLOG 13), null for a mount made by an older version */
 export interface WinfsMount {
   dst: string;
   src: string;
   owned: boolean;
+  client?: string | null;
 }
 
 /** Request timeouts (ms): 10 s, long ones 30–60 s (DESIGN §9 rpc.ts). */

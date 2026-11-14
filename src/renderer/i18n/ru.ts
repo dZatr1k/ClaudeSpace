@@ -572,6 +572,8 @@ export const ru = {
     unmount: (l: string) => `Отключить диск ${l}`,
     unmountManual: (l: string) => `Отключить диск ${l} (подключён вручную)`,
     manual: 'вручную',
+    other: 'другим ClaudeSpace',
+    unmountOther: (l: string) => `Отключить диск ${l} (подключил другой ClaudeSpace)`,
     disk: (l: string, mark: string) => `диск ${l} ${mark}`,
     prefix: (s: string) => `ПК: ${s}`,
     settings: 'Настройки ПК ↔ VM…',

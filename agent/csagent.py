@@ -686,13 +686,13 @@ class Agent:
                 'winfs': os.access(winfs.winfs_path(), os.X_OK)}
 
     def m_winfs_mount(self, p):
-        res = winfs.mount(p_str(p, 'src', max_len=260), p_str(p, 'dst', max_len=1024))
+        res = winfs.mount(p_str(p, 'src', max_len=260), p_str(p, 'dst', max_len=1024), client=p.get('client'))
         self.poll_winfs()
         return res
 
     def m_winfs_unmount(self, p):
         res = winfs.unmount(p_str(p, 'dst', max_len=1024), only_owned=p_bool(p, 'onlyOwned', True),
-                            lazy=p_bool(p, 'lazy', False))
+                            lazy=p_bool(p, 'lazy', False), client=p.get('client'))
         self.poll_winfs()
         return res
 

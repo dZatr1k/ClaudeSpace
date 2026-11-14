@@ -22,7 +22,7 @@ import { mapLocalUrl, parseLocalUrl, portUrl } from '../shared/ports';
 import type { PortOpenResult } from '../shared/ipc';
 import type { VmPort } from '../shared/protocol';
 import type { Transport } from './transport/types';
-import { Store } from './store';
+import { loadClientId, Store } from './store';
 import { DataCache } from './snapshot';
 import { uploadImage } from './images';
 import { FileTransfers } from './files';
@@ -85,7 +85,12 @@ const terminals = new TerminalManager(
   () => store.settings.connection.tmuxSocket,
 );
 
-const pclink = new PcLink({ conn, settings: () => store.settings, log }).attach();
+const pclink = new PcLink({
+  conn,
+  settings: () => store.settings,
+  clientId: loadClientId(userData),
+  log,
+}).attach();
 pclink.on('state', (s) => send('pclink.state', s));
 
 const ports = new PortForwarder({ transport: () => conn.transport, settings: () => store.settings, log });

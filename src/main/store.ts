@@ -1,4 +1,5 @@
 // userData files: settings.json, workspace.json, cache/snapshot.json. Atomic writes (tmp + rename).
+import { randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Snapshot, Workspace } from '../shared/model';
@@ -10,6 +11,25 @@ export function atomicWrite(file: string, data: string): void {
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, data, { mode: 0o600 });
   renameSync(tmp, file);
+}
+
+/** id of this installation (userData/client-id), created once: tells our «Диск ПК» mounts from another ClaudeSpace's on
+ * the same VM (BACKLOG 13). Not a secret. */
+export function loadClientId(userData: string): string {
+  const file = join(userData, 'client-id');
+  try {
+    const id = readFileSync(file, 'utf8').trim();
+    if (/^[A-Za-z0-9_-]{8,64}$/.test(id)) return id;
+  } catch {
+    // first run
+  }
+  const id = randomBytes(12).toString('hex');
+  try {
+    atomicWrite(file, id + '\n');
+  } catch {
+    // read-only userData: the id lives for this run only
+  }
+  return id;
 }
 
 function readJson(file: string): unknown {

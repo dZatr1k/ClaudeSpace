@@ -5,6 +5,8 @@
   markdown and images; paste a path into the chat, download to the PC, open in VS Code; drop files from the PC
   onto a folder to upload them.
 - Git tab: branch and upstream, changed files by group, recent commits, a diff viewer; changes are made in lazygit.
+- Two ClaudeSpace copies on one VM (say, a dev build and the installed app) no longer unmount each other's PC disk
+  on exit.
 
 ## 0.5.0
 - Images in chats: paste a screenshot with Ctrl+V or drop image files onto a terminal. The image is uploaded

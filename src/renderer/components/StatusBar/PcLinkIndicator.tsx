@@ -36,7 +36,7 @@ function tip(s: PcLinkState): string {
   if (s.conns) lines.push(t.pclink.conns(s.conns));
   for (const m of s.mounts) {
     lines.push(
-      `${m.src} → ${m.dst}${m.mounted && !m.owned ? ` (${t.pclink.manual})` : ''}${m.error ? `: ${m.error}` : ''}`,
+      `${m.src} → ${m.dst}${m.mounted && !m.owned ? ` (${m.other ? t.pclink.other : t.pclink.manual})` : ''}${m.error ? `: ${m.error}` : ''}`,
     );
   }
   return lines.join('\n');
@@ -60,7 +60,9 @@ export function PcLinkIndicator({ className }: { className: string }) {
       label: m.mounted
         ? m.owned
           ? t.pclink.unmount(m.label)
-          : t.pclink.unmountManual(m.label)
+          : m.other
+            ? t.pclink.unmountOther(m.label)
+            : t.pclink.unmountManual(m.label)
         : t.pclink.mount(m.label),
       hint: m.src,
       icon: <HardDrive size={13} />,

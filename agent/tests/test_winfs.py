@@ -128,9 +128,9 @@ class AgentWinfsTest(unittest.TestCase):
         v = os.path.join(self.fh.home, 'winfs', 'V')
         st = self.ok(a, 'winfs_status', {})
         self.assertTrue(st['winfs'])
-        self.assertEqual(st['mounts'], [{'dst': self.manual, 'src': 'C:/Users', 'owned': False}])
+        self.assertEqual(st['mounts'], [{'dst': self.manual, 'src': 'C:/Users', 'owned': False, 'client': None}])
         r = self.ok(a, 'winfs_mount', {'src': 'C:\\Data', 'dst': '~/winfs/V'})
-        self.assertEqual(r, {'dst': v, 'src': 'C:/Data', 'owned': True, 'already': False})
+        self.assertEqual(r, {'dst': v, 'src': 'C:/Data', 'owned': True, 'already': False, 'other': False})
         self.assertEqual(self.calls(), [f'winfs C:/Data {v}'])
         ev, _ = a.wait_event('winfs_changed', lambda d: any(m['dst'] == v for m in d['mounts']))
         self.assertTrue(next(m for m in ev['mounts'] if m['dst'] == v)['owned'])
@@ -200,6 +200,32 @@ class AgentWinfsTest(unittest.TestCase):
         self.assertIn(v, self.mounted())
         self.agents.remove(new)
         new.close()
+        self.assertNotIn(v, self.mounted())
+
+    def test_other_client_keeps_hands_off(self):
+        """BACKLOG 13: a second ClaudeSpace on the same VM (another client id) neither takes the mount over nor
+        unmounts it, on exit or with onlyOwned; the owner's reconnect still takes it over."""
+        pc = self.agent()
+        v = os.path.join(self.fh.home, 'winfs', 'V')
+        self.ok(pc, 'winfs_mount', {'src': 'C:/Data', 'dst': '~/winfs/V', 'client': 'pc-app'})
+        st = {m['dst']: m for m in self.ok(pc, 'winfs_status', {})['mounts']}
+        self.assertEqual((st[v]['owned'], st[v]['client']), (True, 'pc-app'))
+        dev = self.agent()
+        r = self.ok(dev, 'winfs_mount', {'src': 'C:/Data', 'dst': '~/winfs/V', 'client': 'dev-copy'})
+        self.assertEqual((r['already'], r['owned'], r['other']), (True, False, True))
+        r = self.ok(dev, 'winfs_unmount', {'dst': '~/winfs/V', 'onlyOwned': True, 'lazy': True, 'client': 'dev-copy'})
+        self.assertEqual(r.get('skipped'), 'other')
+        self.agents.remove(dev)
+        dev.close()
+        self.assertIn(v, self.mounted())
+        again = self.agent()   # the PC app reconnects: same client, takes over
+        r = self.ok(again, 'winfs_mount', {'src': 'C:/Data', 'dst': '~/winfs/V', 'client': 'pc-app'})
+        self.assertEqual((r['owned'], r['other']), (True, False))
+        self.agents.remove(pc)
+        pc.close()
+        self.assertIn(v, self.mounted())
+        self.agents.remove(again)
+        again.close()
         self.assertNotIn(v, self.mounted())
 
 

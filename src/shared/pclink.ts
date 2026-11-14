@@ -28,6 +28,8 @@ export interface PcMountState {
   mounted: boolean;
   /** mounted by ClaudeSpace (unmounted on quit); false = mounted by hand, never touched automatically */
   owned: boolean;
+  /** mounted by another ClaudeSpace on the same VM (a dev copy, a second PC): shown, never touched (BACKLOG 13) */
+  other: boolean;
   busy: 'mount' | 'unmount' | null;
   error: string | null;
 }

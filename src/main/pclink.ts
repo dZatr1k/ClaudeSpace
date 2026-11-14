@@ -8,7 +8,8 @@
 // - Each tunnel connection is piped to net.connect(127.0.0.1:22). If this PC's sshd is not listening, the channel is
 //   rejected at once (no hang for the VM side) and the state says sshd is down (logged once per change).
 // - Mounts: mounted on connect (setting), ownership is decided by the agent (cclib/winfs.py). On disconnect/quit we
-//   lazily unmount only our own mounts; if the app vanishes, the agent does it on EOF.
+//   lazily unmount only our own mounts; if the app vanishes, the agent does it on EOF. «Our own» = this installation
+//   (clientId): a mount made by another ClaudeSpace on the same VM is shown, but never taken over or unmounted.
 import { EventEmitter } from 'node:events';
 import { connect as netConnect } from 'node:net';
 import type { Socket } from 'node:net';
@@ -31,6 +32,8 @@ export interface LinkConn {
 export interface PcLinkDeps {
   conn: LinkConn;
   settings: () => Settings;
+  /** this app installation (userData/client-id): another ClaudeSpace on the same VM keeps off our mounts (BACKLOG 13) */
+  clientId?: string;
   log?: (...a: unknown[]) => void;
   /** tests: where the PC's sshd is (default 127.0.0.1:22) */
   pcHost?: string;
@@ -122,6 +125,11 @@ export class PcLink extends EventEmitter {
     if (v === 'ok' && wasDown && this.usable) void this.autoMount(this.gen);
   }
 
+  /** mounted by this installation (a mount from an older version without a client id counts as ours) */
+  private mine(a: WinfsMount | undefined): boolean {
+    return !!a?.owned && (!a.client || !this.deps.clientId || a.client === this.deps.clientId);
+  }
+
   private setActual(m: WinfsMount[]) {
     this.actual = Array.isArray(m) ? m : [];
     this.refreshMounts();
@@ -137,12 +145,17 @@ export class PcLink extends EventEmitter {
         dst,
         label: mountLabel(dst),
         mounted: !!a,
-        owned: !!a?.owned,
+        owned: this.mine(a),
+        other: !!a?.owned && !this.mine(a),
         busy: this.busy.get(abs) ?? null,
         error: this.errors.get(abs) ?? null,
       };
     });
     this.set({ mounts });
+  }
+
+  private get client(): { client?: string } {
+    return this.deps.clientId ? { client: this.deps.clientId } : {};
   }
 
   get usable(): boolean {
@@ -339,7 +352,7 @@ export class PcLink extends EventEmitter {
       if (!s.autoMount && !this.appMounted.has(abs)) continue;
       if (gen !== this.gen) return;
       const a = this.actual.find((x) => x.dst === abs);
-      if (a && !a.owned && !this.appMounted.has(abs)) continue; // mounted by hand: leave it alone
+      if (a && !this.mine(a) && !this.appMounted.has(abs)) continue; // by hand or another ClaudeSpace: leave it alone
       await this.mount(m.dst, true);
     }
   }
@@ -353,7 +366,7 @@ export class PcLink extends EventEmitter {
     this.errors.delete(abs);
     this.refreshMounts();
     try {
-      const r = await this.call('winfs_mount', { src: m.src, dst: m.dst });
+      const r = await this.call('winfs_mount', { src: m.src, dst: m.dst, ...this.client });
       if (r.owned) this.appMounted.add(r.dst);
       this.log(
         '[pclink] mount',
@@ -361,7 +374,7 @@ export class PcLink extends EventEmitter {
         '->',
         r.dst,
         r.already ? '(already)' : '',
-        r.owned ? 'ours' : 'manual',
+        r.owned ? 'ours' : r.other ? 'other app' : 'manual',
       );
       return { ok: true };
     } catch (e) {
@@ -383,7 +396,7 @@ export class PcLink extends EventEmitter {
     this.refreshMounts();
     try {
       // explicit user action: may unmount a manual mount too (the menu says which one it is)
-      await this.call('winfs_unmount', { dst, onlyOwned: false });
+      await this.call('winfs_unmount', { dst, onlyOwned: false, ...this.client });
       this.appMounted.delete(abs);
       this.log('[pclink] unmount', dst);
       return { ok: true };
@@ -429,9 +442,9 @@ export class PcLink extends EventEmitter {
   async shutdown(timeoutMs = 5000): Promise<void> {
     this.clearTimer();
     const work = (async () => {
-      for (const m of this.actual.filter((x) => x.owned)) {
+      for (const m of this.actual.filter((x) => this.mine(x))) {
         try {
-          await this.call('winfs_unmount', { dst: m.dst, onlyOwned: true, lazy: true });
+          await this.call('winfs_unmount', { dst: m.dst, onlyOwned: true, lazy: true, ...this.client });
           this.log('[pclink] unmounted on exit', m.dst);
         } catch (e) {
           this.log('[pclink] unmount on exit failed', m.dst, errText(e));
