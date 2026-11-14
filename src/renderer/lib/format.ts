@@ -25,7 +25,7 @@ function hhmm(d: Date): string {
 }
 
 export function formatAgo(ms: number | null | undefined, now = Date.now()): string {
-  if (!ms) return '—';
+  if (!ms) return 'нет';
   const diff = now - ms;
   if (diff < 60_000) return 'сейчас';
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} мин`;
@@ -48,7 +48,7 @@ export function formatDuration(ms: number): string {
 
 /** Clock time for "с 14:05": today -> «14:05», yesterday -> «вчера 14:05», older -> «08.11 14:05». */
 export function formatClock(ms: number | null | undefined, now = Date.now()): string {
-  if (!ms) return '—';
+  if (!ms) return 'нет';
   const d = new Date(ms);
   const today = startOfDay(now);
   if (ms >= today) return hhmm(d);
@@ -79,7 +79,7 @@ export function plural(n: number, forms: [string, string, string]): string {
 }
 
 export function formatWhen(ms: number | null | undefined): string {
-  if (!ms) return '—';
+  if (!ms) return 'нет';
   const d = new Date(ms);
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getFullYear()).slice(2)} ${hhmm(d)}`;
 }

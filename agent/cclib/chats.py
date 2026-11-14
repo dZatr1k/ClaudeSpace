@@ -350,7 +350,7 @@ def move_chat(sid, to_archive, is_open):
         if bool(c.get('archived')) == to_archive:
             raise MoveError('exists', 'чат уже в архиве' if to_archive else 'чат не в архиве')
         if to_archive and is_open(sid):
-            raise MoveError('chat_open', 'чат сейчас открыт — сначала закройте его')
+            raise MoveError('chat_open', 'чат сейчас открыт, сначала закройте его сессию')
         src_dir = os.path.dirname(c['path'])
         proj = os.path.basename(src_dir)
         dst_dir = os.path.join(P.archive_dir if to_archive else os.path.join(P.claude_dir, 'projects'), proj)

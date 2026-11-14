@@ -19,7 +19,7 @@ describe('formatAgo', () => {
     expect(formatAgo(new Date(2026, 10, 7, 14, 20).getTime(), now)).toBe('вчера 14:20');
     expect(formatAgo(new Date(2026, 10, 3, 9, 0).getTime(), now)).toBe('3 нояб.');
     expect(formatAgo(new Date(2025, 0, 3).getTime(), now)).toBe('3 янв. 2025');
-    expect(formatAgo(null, now)).toBe('—');
+    expect(formatAgo(null, now)).toBe('нет');
   });
   it('groups by day', () => {
     expect(dayGroup(now - 1000, now)).toBe('today');

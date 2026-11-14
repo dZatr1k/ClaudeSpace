@@ -18,7 +18,7 @@ function Snippet({ m }: { m: SearchMatch }) {
   const [s, e] = m.match;
   return (
     <div className="truncate text-[12px] text-muted">
-      <span className="mr-1 text-faint">{m.role === 'user' ? t.search.you : 'claude'}:</span>
+      <span className="mr-1 font-medium text-faint">{m.role === 'user' ? t.search.you : t.info.claude}:</span>
       {m.text.slice(0, s)}
       <mark className="rounded-[2px] bg-accent-soft px-0.5 text-fg">{m.text.slice(s, e)}</mark>
       {m.text.slice(e)}
@@ -75,16 +75,17 @@ function Panel({ initial }: { initial: string }) {
   }, [sel]);
 
   const pname = (p: string | null) =>
-    p ? (projects.find((x) => x.path === p)?.name ?? shortPath(p, home)) : '‹папка?›';
+    p ? (projects.find((x) => x.path === p)?.name ?? shortPath(p, home)) : t.sidebar.noFolder;
   const cur = st.hits[sel];
   return (
     <div className="flex h-[60vh] flex-col">
-      <div className="flex items-center gap-2 rounded-[6px] border border-line-strong bg-base px-2">
-        <Search size={14} className="text-faint" />
+      <div className="flex items-center gap-2 rounded-[6px] border border-control bg-base px-3 focus-within:border-accent focus-within:outline focus-within:outline-1 focus-within:outline-accent">
+        <Search size={15} className="text-faint" aria-hidden />
         <input
           autoFocus
           data-testid="chat-search-input"
-          className="h-8 min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+          aria-label={t.search.title}
+          className="h-10 min-w-0 flex-1 bg-transparent text-[14px] outline-none"
           placeholder={t.search.placeholder}
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -103,7 +104,7 @@ function Panel({ initial }: { initial: string }) {
           }}
         />
       </div>
-      <div className="mt-1.5 text-[12px] text-faint" data-testid="chat-search-status">
+      <div className="mt-2 text-[12px] text-muted" role="status" data-testid="chat-search-status">
         {online ? statusLine(st) : t.search.offline}
       </div>
       <div ref={list} className="mt-2 min-h-0 flex-1 overflow-y-auto">
@@ -114,20 +115,20 @@ function Panel({ initial }: { initial: string }) {
             data-testid={`search-hit-${h.chatId}`}
             role="button"
             tabIndex={-1}
-            className={`group cursor-default rounded-[6px] px-2 py-1.5 ${i === sel ? 'bg-selected' : 'hover:bg-hover'}`}
+            className={`group rounded-[6px] px-3 py-2 ${i === sel ? 'bg-selected' : 'hover:bg-hover'}`}
             onMouseEnter={() => setSel(i)}
             onClick={() => show(h)}
             onDoubleClick={() => cont(h)}
           >
             <div className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-[13px]">{h.title}</span>
-              <span className="tnum shrink-0 text-[12px] text-faint">
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{h.title}</span>
+              <span className="tnum shrink-0 text-[12px] text-muted">
                 {pname(h.project)} · {formatAgo(h.lastAt)}
                 {h.archived ? ` · ${t.search.archived}` : ''} · {t.search.matches(h.count)}
               </span>
               <Button
                 small
-                className="invisible group-hover:visible"
+                className={i === sel ? '' : 'invisible group-hover:visible'}
                 onClick={(e) => {
                   e.stopPropagation();
                   cont(h);
@@ -142,7 +143,7 @@ function Panel({ initial }: { initial: string }) {
           </div>
         ))}
       </div>
-      <div className="mt-2 text-[12px] text-faint">{t.search.keys}</div>
+      <div className="mt-3 border-t border-line pt-2 text-[12px] text-faint">{t.search.keys}</div>
     </div>
   );
 }

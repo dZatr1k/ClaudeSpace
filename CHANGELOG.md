@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+- UI redesign: warm graphite palette with an orange accent, new start screen, unified connection and
+  terminal state cards, clearer copy, better contrast in both themes (ANSI colors included).
+
 ## 0.2.3
 - First release delivered by auto-update; changelog added.
 

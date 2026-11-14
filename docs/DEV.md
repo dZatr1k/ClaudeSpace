@@ -28,7 +28,7 @@ npm run dev:vm              # на этой VM (Electron с --no-sandbox, см. 
 | `npm run test:agent` | агент: unittest (stdlib), фейковый HOME, реальный tmux на отдельном сокете `claudespace-test-py-*` | 90 |
 | `npm run test:unit` | vitest: unit (hostkey, rpc, keymap, format, stores, terminals, settings, ports, askpass, search, tray…) + integration | 110 |
 | `npm test` | оба набора | 200 |
-| `npm run test:e2e` | Playwright `_electron`: окно, сайдбар, терминал, палитра, оверлеи, пароль sudo, поиск по чатам, закрытие в трей, обрыв, перезапуск; скриншоты в `docs/screenshots/` (собирает `out/`: сначала `npm run build`) | 1 сценарий |
+| `npm run test:e2e` | Playwright `_electron`: окно, сайдбар, терминал, палитра, оверлеи, пароль sudo, поиск по чатам, закрытие в трей, обрыв, перезапуск; скриншоты в `docs/screenshots/`, включая узкое окно 960×600 и светлую тему (собирает `out/`: сначала `npm run build`) | 1 сценарий |
 | `npm run lint`, `npm run typecheck` | ESLint + Prettier, `tsc` strict для main/preload/shared и renderer | |
 
 - **Интеграционные тесты** (`tests/integration/`):

@@ -1,4 +1,4 @@
-import { CheckCircle2, Info, TriangleAlert, X } from 'lucide-react';
+import { CheckCircle2, Info, LoaderCircle, Plus, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import * as A from '../../actions';
 import { agent } from '../../bridge';
@@ -12,7 +12,7 @@ import { Modal } from '../ui/Modal';
 
 const close = () => useUi.getState().set({ dialog: null });
 const inputCls =
-  'h-8 w-full rounded-[4px] border border-line-strong bg-base px-2 text-[13px] outline-none focus:border-accent';
+  'h-8 w-full rounded-[4px] border border-control bg-base px-2.5 text-[13px] outline-none focus:border-accent focus:outline focus:outline-1 focus:outline-accent';
 
 function Confirm({ d }: { d: Extract<Dialog, { kind: 'confirm' }> }) {
   return (
@@ -37,8 +37,13 @@ function Confirm({ d }: { d: Extract<Dialog, { kind: 'confirm' }> }) {
         </>
       }
     >
-      {d.danger && <div className="mb-2 font-semibold text-st-error">{d.danger}</div>}
-      {d.body && <div className="text-[13px] text-muted">{d.body}</div>}
+      {d.danger && (
+        <div className="mb-2 flex items-center gap-2 font-semibold text-st-error">
+          <TriangleAlert size={15} aria-hidden />
+          {d.danger}
+        </div>
+      )}
+      {d.body && <div className="text-[13px] leading-relaxed text-muted">{d.body}</div>}
     </Modal>
   );
 }
@@ -69,6 +74,7 @@ function Prompt({ d }: { d: Extract<Dialog, { kind: 'prompt' }> }) {
         className={inputCls}
         value={v}
         placeholder={d.placeholder}
+        aria-label={typeof d.title === 'string' ? d.title : undefined}
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && submit()}
       />
@@ -113,6 +119,7 @@ function NewChat() {
             autoFocus
             className={inputCls}
             placeholder={t.sidebar.filter}
+            aria-label={t.sidebar.filter}
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
@@ -128,11 +135,16 @@ function NewChat() {
             }}
           />
           <div className="mt-2 max-h-[46vh] overflow-y-auto">
-            {dirs === null && <div className="p-2 text-[12px] text-muted">{t.info.loading}</div>}
+            {dirs === null && (
+              <div className="flex items-center gap-2 p-2 text-[12px] text-muted" role="status">
+                <LoaderCircle size={12} className="anim-spin" aria-hidden />
+                {t.dialogs.loadingDirs}
+              </div>
+            )}
             {list.map((d, i) => (
               <button
                 key={d}
-                className={`flex h-8 w-full items-center rounded px-2 text-left text-[13px] ${i === idx ? 'bg-selected' : 'hover:bg-hover'}`}
+                className={`mono flex h-8 w-full items-center rounded-[4px] px-2 text-left text-[12px] ${i === idx ? 'bg-selected text-fg' : 'hover:bg-hover'}`}
                 onMouseEnter={() => setIdx(i)}
                 onClick={() => pick(d)}
               >
@@ -140,19 +152,23 @@ function NewChat() {
               </button>
             ))}
             <button
-              className={`flex h-8 w-full items-center rounded px-2 text-left text-[13px] text-accent ${idx === list.length ? 'bg-selected' : 'hover:bg-hover'}`}
+              className={`flex h-8 w-full items-center gap-2 rounded-[4px] px-2 text-left text-[13px] font-medium text-accent-text ${idx === list.length ? 'bg-selected' : 'hover:bg-hover'}`}
               onClick={() => setOther((home ?? '~') + '/projects/')}
             >
-              + {t.dialogs.otherFolder}
+              <Plus size={14} aria-hidden />
+              {t.dialogs.otherFolder}
             </button>
           </div>
         </>
       ) : (
         <div className="space-y-2">
-          <div className="text-[12px] text-muted">{t.dialogs.path}</div>
+          <label htmlFor="cs-other-path" className="block text-[12px] text-muted">
+            {t.dialogs.path}
+          </label>
           <input
+            id="cs-other-path"
             autoFocus
-            className={inputCls}
+            className={`${inputCls} font-mono text-[12px]`}
             value={other}
             onChange={(e) => setOther(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void submitOther()}
@@ -210,9 +226,13 @@ function CreateProject() {
       }
     >
       <div className="space-y-3">
+        <label htmlFor="cs-project-path" className="block text-[12px] text-muted">
+          {t.dialogs.projectPath}
+        </label>
         <input
+          id="cs-project-path"
           autoFocus
-          className={inputCls}
+          className={`${inputCls} font-mono text-[12px]`}
           value={path}
           onChange={(e) => setPath(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void submit()}
@@ -265,23 +285,29 @@ function Clone() {
               A.cloneRepo(url, dest);
             }}
           >
-            {t.actions.clone.replace('…', '')}
+            {t.dialogs.cloneAction}
           </Button>
         </>
       }
     >
       <div className="space-y-2 text-[13px]">
-        <div className="text-muted">{t.dialogs.cloneUrl}</div>
+        <label htmlFor="cs-clone-url" className="block text-[12px] text-muted">
+          {t.dialogs.cloneUrl}
+        </label>
         <input
+          id="cs-clone-url"
           autoFocus
-          className={inputCls}
+          className={`${inputCls} font-mono text-[12px]`}
           value={url}
           placeholder="https://github.com/user/repo.git"
           onChange={(e) => onUrl(e.target.value)}
         />
-        <div className="text-muted">{t.dialogs.cloneDest}</div>
+        <label htmlFor="cs-clone-dest" className="block pt-1 text-[12px] text-muted">
+          {t.dialogs.cloneDest}
+        </label>
         <input
-          className={inputCls}
+          id="cs-clone-dest"
+          className={`${inputCls} font-mono text-[12px]`}
           value={dest}
           onChange={(e) => {
             setTouched(true);
@@ -318,7 +344,7 @@ function Paste({ d }: { d: Extract<Dialog, { kind: 'paste' }> }) {
       }
     >
       <div className="mb-2 text-[13px]">{t.term.pasteBody(lines.length)}</div>
-      <pre className="max-h-60 overflow-auto rounded bg-base p-2 font-mono text-[11px] text-muted">
+      <pre className="max-h-60 overflow-auto rounded-[6px] border border-line bg-base p-3 font-mono text-[12px] text-muted">
         {lines.slice(0, 30).join('\n')}
         {lines.length > 30 ? `\n… (+${lines.length - 30})` : ''}
       </pre>
@@ -371,14 +397,14 @@ function ToastItem({ toast }: { toast: Toast }) {
     toast.kind === 'error' ? 'text-st-error' : toast.kind === 'success' ? 'text-st-idle' : 'text-st-busy';
   return (
     <div
-      role="status"
-      className="flex min-w-[280px] max-w-[440px] items-start gap-2 rounded-[8px] border border-line-strong bg-elevated px-3 py-2 text-[13px] shadow-float"
+      role={toast.kind === 'error' ? 'alert' : 'status'}
+      className="anim-slide flex min-w-[300px] max-w-[440px] items-start gap-2.5 rounded-[10px] border border-line-strong bg-elevated py-2.5 pl-3 pr-2 text-[13px] leading-snug shadow-pop"
     >
-      <Icon size={16} className={`mt-0.5 shrink-0 ${color}`} />
+      <Icon size={16} className={`mt-0.5 shrink-0 ${color}`} aria-hidden />
       <div className="min-w-0 flex-1 selectable">{toast.text}</div>
       {toast.action && (
         <button
-          className="shrink-0 font-medium text-accent hover:underline"
+          className="shrink-0 rounded-[4px] px-1 font-semibold text-accent-text hover:underline"
           onClick={() => {
             toast.action?.run();
             useUi.getState().dismissToast(toast.id);
@@ -389,10 +415,10 @@ function ToastItem({ toast }: { toast: Toast }) {
       )}
       <button
         aria-label={t.actions.close}
-        className="shrink-0 text-muted hover:text-fg"
+        className="shrink-0 rounded-[4px] p-0.5 text-muted hover:bg-hover hover:text-fg"
         onClick={() => useUi.getState().dismissToast(toast.id)}
       >
-        <X size={14} />
+        <X size={14} aria-hidden />
       </button>
     </div>
   );

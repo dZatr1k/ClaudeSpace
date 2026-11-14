@@ -61,11 +61,11 @@ export function createWindow(opts: {
     frame: false,
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: dark ? '#15181D' : '#F3F4F6',
-      symbolColor: dark ? '#E6E8EB' : '#1A1D21',
+      color: dark ? '#191816' : '#F3F1EE',
+      symbolColor: dark ? '#EDE9E4' : '#1D1B19',
       height: 36,
     },
-    backgroundColor: dark ? '#0F1115' : '#FBFBFC',
+    backgroundColor: dark ? '#121110' : '#FBFAF8',
     title: 'ClaudeSpace',
     webPreferences: {
       preload: opts.preload,
@@ -97,8 +97,8 @@ export function rendererEntry(win: BrowserWindow): Promise<void> {
 export function setOverlayTheme(win: BrowserWindow, dark: boolean): void {
   try {
     win.setTitleBarOverlay({
-      color: dark ? '#15181D' : '#F3F4F6',
-      symbolColor: dark ? '#E6E8EB' : '#1A1D21',
+      color: dark ? '#191816' : '#F3F1EE',
+      symbolColor: dark ? '#EDE9E4' : '#1D1B19',
       height: 36,
     });
   } catch {

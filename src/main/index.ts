@@ -470,7 +470,7 @@ app.whenReady().then(async () => {
       if (!store.settings.hints.trayShown) {
         showSystemNotification({
           title: 'ClaudeSpace работает в трее',
-          body: 'Связь с VM, туннель ПК и уведомления остаются. Выход — правой кнопкой по значку в трее.',
+          body: 'Связь с VM, туннель ПК и уведомления продолжают работать. Выйти: правой кнопкой по значку в трее → «Выход».',
           session: '',
         });
         send('settings.changed', store.updateSettings({ hints: { trayShown: true } }));

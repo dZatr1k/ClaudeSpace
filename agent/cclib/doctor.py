@@ -129,7 +129,7 @@ def quick():
         level, probs = comp.get('level'), comp.get('problems', [])
     kg = comp.get('known_good')
     hint = f' (работало на {kg})' if kg and kg != ver else ''
-    return {'level': level, 'message': f"Claude Code {ver}: формат изменился — {'; '.join(probs)}{hint}"}
+    return {'level': level, 'message': f"Claude Code {ver}: формат изменился: {'; '.join(probs)}{hint}"}
 
 
 def _which(tool):

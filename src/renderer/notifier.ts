@@ -73,7 +73,7 @@ function notify(ev: TurnDone) {
     useUi
       .getState()
       .toast(
-        `${title} — ${body}`,
+        `${title}. ${body}`,
         ev.kind === 'input' ? 'info' : 'success',
         ev.session ? { label: t.notify.open, run: open } : undefined,
         8000,

@@ -1,11 +1,14 @@
 import {
   ChevronDown,
-  Command,
   GitBranch,
+  LoaderCircle,
   Monitor,
   Plus,
+  Search,
   Settings as SettingsIcon,
   SquareTerminal,
+  TriangleAlert,
+  WifiOff,
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -20,7 +23,7 @@ import { useData } from '../../stores/data';
 import { useTabs } from '../../stores/tabs';
 import { useUi } from '../../stores/ui';
 import { tabMenu } from '../menus';
-import { IconButton } from '../ui/Button';
+import { Button, IconButton, Kbd } from '../ui/Button';
 import { ContextMenu, DropdownMenu } from '../ui/Menu';
 import { StatusIcon } from '../ui/StatusIcon';
 
@@ -33,16 +36,9 @@ function useNow(ms = 1000) {
   return now;
 }
 
-export function ConnDot({ withLabel = false }: { withLabel?: boolean }) {
+/** Connection state as shape + colour (DESIGN §5.2): dot · spinning ring · WifiOff · triangle. */
+export function ConnDot({ withLabel = false, size = 12 }: { withLabel?: boolean; size?: number }) {
   const s = useConn((c) => c.state);
-  const color =
-    s.kind === 'online'
-      ? 'bg-st-idle'
-      : s.kind === 'connecting'
-        ? 'bg-st-waiting anim-pulse'
-        : s.kind === 'needs-user'
-          ? 'bg-st-waiting'
-          : 'bg-st-error';
   const label =
     s.kind === 'online'
       ? t.conn.online
@@ -53,9 +49,26 @@ export function ConnDot({ withLabel = false }: { withLabel?: boolean }) {
           : s.kind === 'idle'
             ? t.conn.idle
             : t.conn.offline;
+  const icon =
+    s.kind === 'online' ? (
+      <span className="inline-block h-2 w-2 rounded-full bg-st-idle" />
+    ) : s.kind === 'connecting' ? (
+      <LoaderCircle size={size} strokeWidth={2.2} className="anim-spin text-st-waiting" aria-hidden />
+    ) : s.kind === 'needs-user' ? (
+      <TriangleAlert size={size} strokeWidth={2.2} className="text-st-waiting" aria-hidden />
+    ) : (
+      <WifiOff size={size} strokeWidth={2.2} className="text-st-error" aria-hidden />
+    );
   return (
     <span className="inline-flex items-center gap-1.5" data-conn={s.kind}>
-      <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
+      <span
+        className="inline-flex items-center justify-center"
+        style={{ width: size, height: size }}
+        role="img"
+        aria-label={label}
+      >
+        {icon}
+      </span>
       {withLabel && <span>{label}</span>}
     </span>
   );
@@ -88,18 +101,22 @@ export function ConnPopover({
   return (
     <div
       ref={ref}
-      className={`no-drag absolute left-2 z-50 ${where === 'title' ? 'top-9' : 'bottom-7'} w-72 rounded-[8px] border border-line-strong bg-elevated p-3 text-[12px] text-fg shadow-float`}
+      role="dialog"
+      aria-label={t.conn.title}
+      className={`anim-slide-l no-drag absolute left-2 z-50 ${where === 'title' ? 'top-10' : 'bottom-8'} w-72 rounded-[10px] border border-line-strong bg-elevated p-4 text-[12px] text-fg shadow-pop`}
     >
-      <div className="mb-2 flex items-center gap-2 text-[13px] font-medium">
-        <ConnDot withLabel />
+      <div className="mb-2 flex items-center gap-2 text-[14px] font-semibold">
+        <ConnDot withLabel size={14} />
       </div>
       <div className="space-y-1 text-muted">
-        <div>{s.kind === 'online' ? s.host : hello ? `${hello.user}@${hello.host}` : '—'}</div>
+        <div className="mono text-fg">
+          {s.kind === 'online' ? s.host : hello ? `${hello.user}@${hello.host}` : '?'}
+        </div>
         {s.kind === 'online' && (
           <>
             <div className="tnum">{t.conn.rtt(s.rttMs)}</div>
             <div className="tnum">{t.conn.since(formatAgo(s.since, now))}</div>
-            <div>агент {s.agent}</div>
+            <div>{t.conn.agent(s.agent)}</div>
           </>
         )}
         {s.kind === 'offline' && (
@@ -110,29 +127,23 @@ export function ConnPopover({
         )}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          className="rounded border border-line-strong px-2 py-1 hover:bg-hover"
-          onClick={() => void invoke('conn.retryNow')}
-        >
+        <Button small onClick={() => void invoke('conn.retryNow')}>
           {t.conn.reconnect}
-        </button>
-        <button
-          className="rounded border border-line-strong px-2 py-1 hover:bg-hover"
-          onClick={() => void invoke('conn.disconnect')}
-        >
+        </Button>
+        <Button small variant="ghost" onClick={() => void invoke('conn.disconnect')}>
           {t.conn.disconnect}
-        </button>
+        </Button>
       </div>
       {dev && (
         <div className="mt-2 flex flex-col gap-1 border-t border-line pt-2">
           <button
-            className="text-left text-faint hover:text-fg"
+            className="text-left text-faint hover:text-fg hover:underline"
             onClick={() => void invoke('conn.debugDrop')}
           >
             {t.conn.debugDrop}
           </button>
           <button
-            className="text-left text-faint hover:text-fg"
+            className="text-left text-faint hover:text-fg hover:underline"
             onClick={() => void invoke('conn.debugFreeze')}
           >
             {t.conn.debugFreeze}
@@ -193,26 +204,26 @@ function TabButton({
           }
         }}
         onClick={() => A.focusTab(tab.id)}
-        className={`no-drag group relative flex h-[30px] min-w-[120px] max-w-[220px] shrink-0 cursor-default items-center gap-1.5 rounded-t-[6px] px-2 text-[13px] ${active ? 'bg-base text-fg' : 'text-muted hover:bg-hover'}`}
+        className={`no-drag group relative flex h-[31px] min-w-[120px] max-w-[220px] shrink-0 items-center gap-1.5 rounded-t-[6px] pl-2.5 pr-1.5 text-[13px] transition-colors duration-100 ${active ? 'bg-base font-medium text-fg' : 'text-muted hover:bg-hover hover:text-fg'} ${status === 'waiting' && !active ? 'text-fg' : ''}`}
       >
-        {active && <span className="absolute inset-x-0 top-0 h-[2px] rounded-t bg-accent" />}
+        {active && <span className="absolute inset-x-1.5 top-0 h-[2px] rounded-b bg-accent" />}
         {tab.kind === 'tmux' ? (
           <StatusIcon status={status} />
         ) : tab.kind === 'lazygit' ? (
-          <GitBranch size={14} className="text-st-none" />
+          <GitBranch size={14} className="shrink-0 text-st-none" aria-hidden />
         ) : (
-          <SquareTerminal size={14} className="text-st-none" />
+          <SquareTerminal size={14} className="shrink-0 text-st-none" aria-hidden />
         )}
         <span className="min-w-0 flex-1 truncate">{title}</span>
         <button
           aria-label={t.actions.closeTab}
-          className={`rounded p-0.5 hover:bg-selected ${active ? 'opacity-60' : 'opacity-0 group-hover:opacity-60'} hover:!opacity-100`}
+          className={`rounded-[4px] p-0.5 text-muted hover:bg-selected hover:text-fg ${active ? 'opacity-70' : 'opacity-0 group-hover:opacity-70 focus-visible:opacity-100'} hover:!opacity-100`}
           onClick={(e) => {
             e.stopPropagation();
             A.closeTab(tab.id);
           }}
         >
-          <X size={12} />
+          <X size={12} aria-hidden />
         </button>
       </div>
     </ContextMenu>
@@ -235,12 +246,13 @@ export function TitleBar() {
     >
       <div className="flex h-9 items-center gap-2 pr-2">
         <button
-          className="no-drag flex items-center gap-2 rounded px-1 py-0.5 hover:bg-hover"
+          className="no-drag flex h-7 items-center gap-2 rounded-[6px] px-2 hover:bg-hover active:bg-selected"
           onClick={() => setPop((p) => !p)}
-          title="Соединение"
+          title={t.conn.title}
+          aria-expanded={pop}
         >
-          <span className="text-[15px] text-accent">◆</span>
-          <span className="text-[13px] font-semibold">ClaudeSpace</span>
+          <span className="diamond text-[13px]" aria-hidden />
+          <span className="text-[13px] font-semibold tracking-[-0.01em]">ClaudeSpace</span>
           <ConnDot />
         </button>
         {pop && <ConnPopover onClose={() => setPop(false)} />}
@@ -270,15 +282,16 @@ export function TitleBar() {
             onClick={() => A.newChatHere()}
             disabled={!online}
           >
-            <Plus size={15} />
+            <Plus size={15} aria-hidden />
           </IconButton>
           <DropdownMenu
             trigger={
               <button
-                className="no-drag -ml-1 rounded p-1 text-muted hover:bg-hover"
-                aria-label="Меню новой вкладки"
+                className="no-drag -ml-1 rounded-[6px] p-1 text-muted hover:bg-hover hover:text-fg"
+                aria-label={t.actions.newTabMenu}
+                title={t.actions.newTabMenu}
               >
-                <ChevronDown size={12} />
+                <ChevronDown size={12} aria-hidden />
               </button>
             }
             items={[
@@ -301,22 +314,27 @@ export function TitleBar() {
           />
         </div>
       </div>
-      <div className="no-drag flex h-9 items-center gap-0.5 pl-2">
-        <IconButton
-          title="Палитра команд (Ctrl+K, Ctrl+Shift+P)"
+      <div className="no-drag flex h-9 items-center gap-1 pl-2">
+        <button
+          type="button"
+          title={`${t.actions.palette} (Ctrl+K, Ctrl+Shift+P)`}
+          aria-label={t.actions.palette}
           onClick={() => useUi.getState().set({ palette: true })}
+          className="no-drag flex h-7 items-center gap-2 rounded-[6px] border border-line-strong bg-base pl-2 pr-1 text-[12px] text-muted transition-colors duration-100 hover:border-control hover:text-fg active:bg-hover"
         >
-          <Command size={15} />
-        </IconButton>
+          <Search size={13} aria-hidden />
+          <span className="hidden lg:inline">{t.actions.paletteTrigger}</span>
+          <Kbd>Ctrl K</Kbd>
+        </button>
         <IconButton title={`${t.actions.rdp} (Ctrl+Alt+R)`} onClick={() => A.openRdp()}>
-          <Monitor size={15} />
+          <Monitor size={15} aria-hidden />
           <span className="ml-1 text-[12px]">RDP</span>
         </IconButton>
         <IconButton
           title={`${t.actions.settings} (Ctrl+,)`}
           onClick={() => useUi.getState().set({ settingsOpen: 'connection' })}
         >
-          <SettingsIcon size={15} />
+          <SettingsIcon size={15} aria-hidden />
         </IconButton>
       </div>
     </header>

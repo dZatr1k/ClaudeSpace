@@ -1,5 +1,15 @@
 // Connection / first run screen (DESIGN §3.2): steps with state, explanations and actions.
-import { Check, ChevronDown, ChevronRight, Circle, Copy, LoaderCircle, ShieldAlert, X } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  Copy,
+  LoaderCircle,
+  ShieldAlert,
+  WifiOff,
+  X,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ConnState, ConnStep } from '@shared/model';
 import type { SshHostsInfo } from '@shared/ipc';
@@ -36,13 +46,13 @@ function failedStep(s: ConnState): ConnStep | null {
 
 function CopyLine({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-2 rounded bg-base px-2 py-1 font-mono text-[12px]">
+    <div className="flex items-center gap-2 rounded-[6px] border border-line bg-base py-1 pl-3 pr-1 font-mono text-[12px]">
       <span className="selectable min-w-0 flex-1 truncate">{text}</span>
       <button
-        className="flex items-center gap-1 text-muted hover:text-fg"
+        className="flex h-6 items-center gap-1 rounded-[4px] px-2 font-sans text-muted hover:bg-hover hover:text-fg"
         onClick={() => void invoke('clipboard.write', { text })}
       >
-        <Copy size={12} /> {t.connect.copy}
+        <Copy size={12} aria-hidden /> {t.connect.copy}
       </button>
     </div>
   );
@@ -65,7 +75,7 @@ function Passphrase({ wrong }: { wrong: boolean }) {
           autoFocus
           aria-label={t.connect.passphrase}
           placeholder={t.connect.passphrase}
-          className="h-8 flex-1 rounded-[4px] border border-line-strong bg-base px-2 outline-none focus:border-accent"
+          className="h-8 flex-1 rounded-[4px] border border-control bg-base px-2.5 outline-none focus:border-accent focus:outline focus:outline-1 focus:outline-accent"
           value={v}
           onChange={(e) => setV(e.target.value)}
         />
@@ -73,7 +83,12 @@ function Passphrase({ wrong }: { wrong: boolean }) {
           {t.connect.login}
         </Button>
       </div>
-      {wrong && <div className="text-[12px] text-st-error">{t.connect.wrongPassphrase}</div>}
+      {wrong && (
+        <div className="flex items-center gap-1.5 text-[12px] text-st-error" role="alert">
+          <X size={12} aria-hidden />
+          {t.connect.wrongPassphrase}
+        </div>
+      )}
     </form>
   );
 }
@@ -114,7 +129,7 @@ function StepDetail({ s, platform }: { s: Extract<ConnState, { kind: 'needs-user
           ) : null}
           <div className="flex items-center gap-2">
             <Button onClick={() => void invoke('conn.retryNow')}>{t.connect.checkAgain}</Button>
-            <span className="text-[12px] text-faint">или</span>
+            <span className="text-[12px] text-faint">{t.connect.or}</span>
             <Button onClick={() => setPass(true)}>{t.connect.enterPassphrase}</Button>
           </div>
           {pass && <Passphrase wrong={s.reason === 'passphrase'} />}
@@ -131,7 +146,9 @@ function StepDetail({ s, platform }: { s: Extract<ConnState, { kind: 'needs-user
       return (
         <div className="space-y-2">
           <div>{t.connect.hostNew(s.host ?? '')}</div>
-          <div className="selectable font-mono text-[12px]">{s.fingerprint}</div>
+          <div className="selectable rounded-[6px] bg-base px-3 py-2 font-mono text-[12px]">
+            {s.fingerprint}
+          </div>
           <div className="text-[12px] text-muted">{t.connect.hostNewQ}</div>
           <CopyLine text="ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub" />
           <div className="flex gap-2">
@@ -146,9 +163,9 @@ function StepDetail({ s, platform }: { s: Extract<ConnState, { kind: 'needs-user
       );
     case 'hostkey-mismatch':
       return (
-        <div className="space-y-2 rounded border border-st-error p-3">
+        <div className="space-y-2 rounded-[6px] border border-st-error p-3" role="alert">
           <div className="flex items-center gap-2 font-semibold text-st-error">
-            <ShieldAlert size={16} /> {t.connect.hostMismatch}
+            <ShieldAlert size={16} aria-hidden /> {t.connect.hostMismatch}
           </div>
           <div className="selectable font-mono text-[12px]">
             {s.host}: {s.fingerprint}
@@ -193,34 +210,37 @@ export function ConnectScreen() {
   const r = hosts?.resolved;
   return (
     <div
-      className="flex h-full w-full items-start justify-center overflow-auto bg-base pt-[8vh]"
+      className="flex h-full w-full items-start justify-center overflow-auto bg-base px-6 pb-10 pt-[9vh]"
       data-testid="connect-screen"
     >
-      <div className="w-[640px] max-w-[94%] rounded-[8px] border border-line bg-surface p-6">
-        <div className="mb-5 flex items-center justify-center gap-2 text-[20px] font-semibold">
-          <span className="text-accent">◆</span> {t.connect.title}
+      <div className="w-[600px] max-w-full">
+        <div className="mb-2 flex items-center gap-3">
+          <span className="diamond text-[22px]" aria-hidden />
+          <h1 className="text-[22px] font-semibold tracking-[-0.01em]">{t.connect.title}</h1>
         </div>
-        <div className="mb-4 space-y-1 text-[13px]">
+        <p className="mb-6 text-[13px] text-muted">{t.connect.subtitle}</p>
+        <div className="mb-6 space-y-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-[13px]">
           <div className="flex gap-3">
-            <span className="w-16 text-muted">{t.connect.host}</span>
-            <span>
+            <span className="w-14 shrink-0 text-muted">{t.connect.host}</span>
+            <span className="mono selectable min-w-0 break-all">
               {local
-                ? 'локально (эта машина)'
+                ? t.connect.local
                 : settings?.connection.manual
                   ? `${settings.connection.manual.user}@${settings.connection.manual.hostname}:${settings.connection.manual.port}`
                   : r
-                    ? `${settings?.connection.host}  ${r.user}@${r.hostname}:${r.port}  (из ~/.ssh/config)`
+                    ? `${settings?.connection.host}  ${r.user}@${r.hostname}:${r.port}  ${t.connect.fromConfig}`
                     : settings?.connection.host}
             </span>
           </div>
           {!local && r?.identityFile && (
             <div className="flex gap-3">
-              <span className="w-16 text-muted">{t.connect.key}</span>
-              <span className="selectable font-mono text-[12px]">{r.identityFile}</span>
+              <span className="w-14 shrink-0 text-muted">{t.connect.key}</span>
+              <span className="mono selectable min-w-0 break-all">{r.identityFile}</span>
             </div>
           )}
         </div>
-        <div className="space-y-2">
+        <ol className="relative space-y-3 pl-1">
+          <span className="absolute bottom-3 left-[11px] top-3 w-px bg-line-strong" aria-hidden />
           {STEPS.map((step) => {
             const idx = order.indexOf(step.id);
             const curIdx = current ? order.indexOf(current) : -1;
@@ -232,14 +252,28 @@ export function ConnectScreen() {
                   : current === step.id && s.kind === 'connecting'
                     ? 'run'
                     : 'wait';
+            const ring =
+              state === 'ok'
+                ? 'border-st-idle bg-st-idle text-[var(--bg-base)]'
+                : state === 'fail'
+                  ? 'border-st-error bg-st-error text-[var(--bg-base)]'
+                  : state === 'run'
+                    ? 'border-st-busy bg-base text-st-busy'
+                    : 'border-line-strong bg-base text-faint';
             return (
-              <div key={step.id}>
-                <div className="flex items-center gap-2 text-[13px]">
-                  {state === 'ok' && <Check size={15} className="text-st-idle" />}
-                  {state === 'fail' && <X size={15} className="text-st-error" />}
-                  {state === 'run' && <LoaderCircle size={15} className="anim-spin text-st-busy" />}
-                  {state === 'wait' && <Circle size={15} className="text-faint" />}
-                  <span className={state === 'wait' ? 'text-muted' : ''}>
+              <li key={step.id} className="relative">
+                <div className="flex items-center gap-3 text-[13px]">
+                  <span
+                    className={`z-[1] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border ${ring} ${state === 'ok' ? 'anim-pop' : ''}`}
+                  >
+                    {state === 'ok' && <Check size={13} strokeWidth={3} aria-hidden />}
+                    {state === 'fail' && <X size={13} strokeWidth={3} aria-hidden />}
+                    {state === 'run' && (
+                      <LoaderCircle size={13} strokeWidth={2.5} className="anim-spin" aria-hidden />
+                    )}
+                    {state === 'wait' && <Circle size={7} fill="currentColor" aria-hidden />}
+                  </span>
+                  <span className={state === 'wait' ? 'text-muted' : 'font-medium'}>
                     {step.id === 'config' && state === 'ok' ? t.connect.configRead : step.label}
                   </span>
                   {state === 'run' && s.kind === 'connecting' && s.detail && (
@@ -247,17 +281,21 @@ export function ConnectScreen() {
                   )}
                 </div>
                 {state === 'fail' && s.kind === 'needs-user' && (
-                  <div className="ml-6 mt-1.5 rounded-[6px] border border-line bg-elevated p-3 text-[13px]">
+                  <div className="anim-rise ml-[34px] mt-2 rounded-[10px] border border-line-strong bg-surface p-4 text-[13px] leading-relaxed">
                     <StepDetail s={s} platform={platform} />
                   </div>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
         {s.kind === 'offline' && (
-          <div className="mt-4 rounded-[6px] border border-line bg-elevated p-3 text-[13px]">
-            <div className="text-st-error">
+          <div
+            className="mt-6 rounded-[10px] border border-line-strong bg-surface p-4 text-[13px]"
+            role="alert"
+          >
+            <div className="flex items-start gap-2 font-medium">
+              <WifiOff size={15} className="mt-0.5 shrink-0 text-st-error" aria-hidden />
               {s.error.startsWith('VM недоступна') ? s.error : t.connect.unreachable(s.error)}
             </div>
             <div className="mt-2 flex items-center gap-3">
@@ -268,16 +306,18 @@ export function ConnectScreen() {
             </div>
           </div>
         )}
-        <div className="mt-6 text-center">
+        <div className="mt-8">
           <button
-            className="inline-flex items-center gap-1 text-[12px] text-muted hover:text-fg"
+            className="inline-flex h-7 items-center gap-1 rounded-[6px] px-2 text-[12px] text-muted hover:bg-hover hover:text-fg"
+            aria-expanded={!!log}
             onClick={() => (log ? setLog(null) : void invoke('conn.log').then(setLog))}
           >
-            {t.connect.details} {log ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            {log ? <ChevronDown size={12} aria-hidden /> : <ChevronRight size={12} aria-hidden />}{' '}
+            {t.connect.details}
           </button>
           {log && (
             <div className="mt-2 text-left">
-              <pre className="selectable max-h-56 overflow-auto rounded bg-base p-2 font-mono text-[11px]">
+              <pre className="selectable max-h-56 overflow-auto rounded-[6px] border border-line bg-surface p-3 font-mono text-[11px]">
                 {log.join('\n')}
               </pre>
               <Button
@@ -285,7 +325,7 @@ export function ConnectScreen() {
                 className="mt-1"
                 onClick={() => void invoke('clipboard.write', { text: log.join('\n') })}
               >
-                <Copy size={12} /> {t.connect.copy}
+                <Copy size={12} aria-hidden /> {t.connect.copyLog}
               </Button>
             </div>
           )}

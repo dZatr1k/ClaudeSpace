@@ -1,5 +1,14 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, MoreHorizontal, Plus, Search, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  LoaderCircle,
+  MessageCircleQuestion,
+  MoreHorizontal,
+  Plus,
+  Search,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import type { Chat, Session } from '@shared/model';
@@ -21,7 +30,7 @@ const sel = () => useUi.getState();
 
 function Row({
   selected,
-  accentBar,
+  marker,
   onSelect,
   onOpen,
   menu,
@@ -31,7 +40,8 @@ function Row({
   testid,
 }: {
   selected: boolean;
-  accentBar?: boolean;
+  /** ◆ «you are here» (DESIGN §5.7): filled = the session of the current tab, outline = open in another tab */
+  marker?: 'current' | 'open' | null;
   onSelect: () => void;
   onOpen: () => void;
   menu: Parameters<typeof ContextMenu>[0]['items'];
@@ -62,21 +72,28 @@ function Row({
         onFocus={onSelect}
         onDoubleClick={onOpen}
         onKeyDown={onKey}
-        className={`group relative flex cursor-default items-center gap-2 rounded-[4px] px-2 outline-none ${selected ? 'bg-selected' : 'hover:bg-hover has-[[data-state=open]]:bg-hover'}`}
+        className={`group relative flex items-center gap-2 rounded-[4px] px-2 ${selected ? 'bg-selected text-fg' : 'hover:bg-hover has-[[data-state=open]]:bg-hover'}`}
         style={{ height }}
       >
-        {accentBar && <span className="absolute inset-y-1 left-0 w-[2px] rounded bg-accent" />}
+        {marker && (
+          <span
+            className={`absolute left-[-9px] top-1/2 h-[7px] w-[7px] -translate-y-1/2 rotate-45 rounded-[1px] ${marker === 'current' ? 'bg-accent' : 'border border-control'}`}
+            title={marker === 'current' ? t.sidebar.current : undefined}
+            aria-hidden
+          />
+        )}
         {children}
         <DropdownMenu
           items={typeof menu === 'function' ? menu() : menu}
           align="end"
           trigger={
             <button
-              aria-label="Действия"
-              className="hidden shrink-0 rounded p-0.5 text-muted hover:bg-selected group-hover:block data-[state=open]:block data-[state=open]:bg-selected"
+              aria-label={t.sidebar.rowActions}
+              title={t.sidebar.rowActions}
+              className="hidden shrink-0 rounded-[4px] p-0.5 text-muted hover:bg-selected hover:text-fg group-hover:block group-focus-within:block data-[state=open]:block data-[state=open]:bg-selected"
               onClick={(e) => e.stopPropagation()}
             >
-              <MoreHorizontal size={14} />
+              <MoreHorizontal size={14} aria-hidden />
             </button>
           }
         />
@@ -94,7 +111,6 @@ function useRowHeights() {
 // ---------------------------------------------------------------- Активные
 function ActiveSection() {
   const sessions = useData((d) => d.sessions);
-  const stale = useData((d) => d.stale);
   const tabs = useTabs((s) => s.tabs);
   const activeId = useTabs((s) => s.activeId);
   const selection = useUi((u) => u.selection);
@@ -106,29 +122,35 @@ function ActiveSection() {
   const activeTabSession = tabs.find((x) => x.id === activeId)?.session;
   const openSessions = new Set(tabs.filter((x) => x.kind === 'tmux').map((x) => x.session));
   const shown = expanded ? sorted : sorted.slice(0, 5);
+  const waiting = sorted.filter((s) => sessionStatus(s).ui === 'waiting').length;
   return (
-    <section
-      className={`shrink-0 border-b border-line px-1.5 pb-1.5 ${stale ? 'opacity-60' : ''}`}
-      data-section="active"
-    >
+    <section className={`shrink-0 border-b border-line px-1.5 pb-2 pt-1`} data-section="active">
       <button
-        className="flex h-7 w-full items-center gap-1 px-1.5"
+        className="flex h-7 w-full items-center gap-1.5 rounded-[4px] px-1.5 hover:bg-hover"
         onClick={() => sel().set({ activeCollapsed: !collapsed })}
+        aria-expanded={!collapsed}
       >
         {collapsed ? (
-          <ChevronRight size={12} className="text-muted" />
+          <ChevronRight size={12} className="text-muted" aria-hidden />
         ) : (
-          <ChevronDown size={12} className="text-muted" />
+          <ChevronDown size={12} className="text-muted" aria-hidden />
         )}
         <span className="section-title flex-1 text-left">{t.sidebar.active}</span>
-        <span className="tnum text-[11px] text-muted">{sessions.length}</span>
+        {waiting > 0 && (
+          <span className="tnum inline-flex h-[18px] items-center gap-1 rounded-full bg-st-waiting-soft px-2 text-[11px] font-semibold text-st-waiting">
+            <MessageCircleQuestion size={11} strokeWidth={2.2} aria-hidden />
+            {t.sidebar.waitingBadge(waiting)}
+          </span>
+        )}
+        <span className="tnum min-w-4 text-right text-[12px] text-muted">{sessions.length}</span>
       </button>
       {!collapsed && (
-        <div>
+        <div className="pl-2.5">
           {sorted.length === 0 && (
-            <div className="flex items-center justify-between px-2 py-1 text-[12px] text-muted">
+            <div className="flex items-center justify-between gap-2 px-2 py-1 text-[12px] text-muted">
               {t.sidebar.noSessions}
               <Button small onClick={() => sel().set({ dialog: { kind: 'newChat' } })} disabled={!online}>
+                <Plus size={13} aria-hidden />
                 {t.actions.newChat}
               </Button>
             </div>
@@ -145,7 +167,7 @@ function ActiveSection() {
           ))}
           {sorted.length > 5 && (
             <button
-              className="px-2 text-[12px] text-muted hover:text-fg"
+              className="h-6 rounded-[4px] px-2 text-[12px] text-muted hover:bg-hover hover:text-fg"
               onClick={() => sel().set({ activeExpanded: !expanded })}
             >
               {expanded ? t.sidebar.less : t.sidebar.more(sorted.length - 5)}
@@ -179,13 +201,13 @@ function SessionRow({
   const tip = [
     shortPath(s.path, useData.getState().hello?.home ?? null),
     t.sidebar.clients(s.attached),
-    `активность ${formatAgo(s.activity)}`,
+    t.sidebar.activity(formatAgo(s.activity)),
   ].join('\n');
   return (
     <Row
       testid={`session-${s.name}`}
       selected={selected}
-      accentBar={open || current}
+      marker={current ? 'current' : open ? 'open' : null}
       height={height}
       title={tip}
       onSelect={() => sel().setSelection({ kind: 'session', name: s.name })}
@@ -193,10 +215,12 @@ function SessionRow({
       menu={() => sessionMenu(s)}
     >
       <StatusIcon status={st.ui} unknown={isUnknownStatus(st.raw)} />
-      <span className="min-w-0 flex-1 truncate">{s.name}</span>
-      {s.windows > 1 && <span className="text-[11px] text-faint">{t.sidebar.windows(s.windows - 1)}</span>}
+      <span className={`min-w-0 flex-1 truncate ${current ? 'font-medium' : ''}`}>{s.name}</span>
+      {s.windows > 1 && (
+        <span className="tnum text-[11px] text-faint">{t.sidebar.windows(s.windows - 1)}</span>
+      )}
       <span
-        className={`shrink-0 text-[12px] group-hover:hidden ${st.ui === 'waiting' ? 'text-st-waiting' : st.ui === 'busy' ? 'text-st-busy' : 'text-muted'}`}
+        className={`shrink-0 text-[12px] group-hover:hidden ${st.ui === 'waiting' ? 'font-medium text-st-waiting' : st.ui === 'busy' ? 'text-st-busy' : 'text-muted'} ${s.claude.length ? '' : 'mono'}`}
       >
         {word}
       </span>
@@ -224,7 +248,7 @@ function ProjectList({ filter }: { filter: string }) {
     return m;
   }, [chats]);
   const list = projects.filter((p) => matches(filter, p.name, p.path, p.git?.branch));
-  if (!list.length) return <Empty text={filter ? t.sidebar.notFound(filter) : t.sidebar.noChats} />;
+  if (!list.length) return <Empty text={filter ? t.sidebar.notFound(filter) : t.sidebar.noProjects} />;
   return (
     <div className="px-1.5 py-1" data-list="projects">
       {list.map((p) => {
@@ -242,14 +266,15 @@ function ProjectList({ filter }: { filter: string }) {
               menu={() => projectMenu(p)}
             >
               <button
-                aria-label={open ? 'Свернуть' : 'Раскрыть'}
-                className="-ml-1 rounded p-0.5 text-muted hover:bg-selected"
+                aria-label={open ? t.sidebar.collapse : t.sidebar.expand}
+                aria-expanded={open}
+                className="-ml-1 rounded-[4px] p-0.5 text-muted hover:bg-selected hover:text-fg"
                 onClick={(e) => {
                   e.stopPropagation();
                   sel().set({ expanded: { ...expanded, [p.path]: !open } });
                 }}
               >
-                {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {open ? <ChevronDown size={12} aria-hidden /> : <ChevronRight size={12} aria-hidden />}
               </button>
               {p.liveSession ? (
                 <StatusIcon status={claudeUi(p.liveStatus)} size={12} />
@@ -257,9 +282,11 @@ function ProjectList({ filter }: { filter: string }) {
                 <span className="w-3" />
               )}
               <span className="min-w-0 truncate">{p.name}</span>
-              {p.git && <span className="min-w-0 shrink truncate text-[12px] text-git">{p.git.branch}</span>}
+              {p.git && (
+                <span className="mono min-w-0 shrink truncate text-[11px] text-git">{p.git.branch}</span>
+              )}
               {p.git?.dirty && (
-                <span className="text-dirty" title="есть незакоммиченные изменения">
+                <span className="text-dirty" title={t.sidebar.dirty} aria-label={t.sidebar.dirty}>
                   ✱
                 </span>
               )}
@@ -279,11 +306,11 @@ function ProjectList({ filter }: { filter: string }) {
                   />
                 ))}
                 {pc.length === 0 && (
-                  <div className="px-2 py-0.5 text-[12px] text-faint">{t.sidebar.noChats}</div>
+                  <div className="px-2 py-0.5 text-[12px] text-faint">{t.sidebar.noProjectChats}</div>
                 )}
                 {pc.length > 10 && (
                   <button
-                    className="px-2 text-[12px] text-muted hover:text-fg"
+                    className="h-6 rounded-[4px] px-2 text-[12px] text-muted hover:bg-hover hover:text-fg"
                     onClick={() => {
                       sel().setLayout({ sidebarTab: 'chats' });
                       sel().set({ projectFilter: p.path });
@@ -379,12 +406,17 @@ function ChatList({ archived, filter }: { archived: boolean; filter: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {projectFilter && (
-        <div className="mx-2 mt-1 flex items-center gap-1 rounded bg-accent-soft px-2 py-0.5 text-[12px]">
+        <div className="mx-2 mt-1.5 flex h-6 items-center gap-1 rounded-[4px] bg-accent-soft pl-2 pr-1 text-[12px]">
           <span className="min-w-0 flex-1 truncate">
             {nameOf.get(projectFilter) ?? shortPath(projectFilter, home)}
           </span>
-          <button aria-label="Сбросить фильтр проекта" onClick={() => sel().set({ projectFilter: null })}>
-            <X size={12} />
+          <button
+            aria-label={t.sidebar.clearProject}
+            title={t.sidebar.clearProject}
+            className="rounded-[4px] p-0.5 hover:bg-hover"
+            onClick={() => sel().set({ projectFilter: null })}
+          >
+            <X size={12} aria-hidden />
           </button>
         </div>
       )}
@@ -416,7 +448,7 @@ function ChatList({ archived, filter }: { archived: boolean; filter: string }) {
                   }}
                 >
                   {it.kind === 'head' ? (
-                    <div className="sticky top-0 flex h-5 items-end bg-surface px-2 text-[11px] font-semibold uppercase tracking-[.06em] text-faint">
+                    <div className="sticky top-0 flex h-5 items-end bg-surface px-2 text-[12px] font-semibold text-muted">
                       {GROUP_LABEL[it.group]}
                     </div>
                   ) : (
@@ -427,7 +459,7 @@ function ChatList({ archived, filter }: { archived: boolean; filter: string }) {
                       projectName={
                         it.chat.project
                           ? (nameOf.get(it.chat.project) ?? shortPath(it.chat.project, home))
-                          : '‹папка?›'
+                          : t.sidebar.noFolder
                       }
                     />
                   )}
@@ -466,7 +498,7 @@ function ChatRow({
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <div className="flex min-w-0 items-center gap-1.5">
           {c.open && <StatusIcon status={claudeUi(c.open.status)} size={12} />}
-          <span className="min-w-0 truncate">{c.title}</span>
+          <span className={`min-w-0 truncate ${selected ? 'font-medium' : ''}`}>{c.title}</span>
         </div>
         <div className="tnum truncate text-[12px] text-muted">
           {projectName} · {formatAgo(c.lastAt)} · {t.sidebar.prompts(c.prompts, c.promptsApprox)}
@@ -483,16 +515,17 @@ function SearchInText({ filter }: { filter: string }) {
     <button
       type="button"
       data-testid="search-in-text"
-      className="block w-full truncate px-2 py-2 text-left text-[12px] text-faint hover:text-fg"
+      className="flex w-full items-center gap-1.5 truncate rounded-[4px] px-2 py-2 text-left text-[12px] text-faint hover:bg-hover hover:text-fg"
       onClick={() => sel().set({ chatSearch: q })}
     >
-      {q.length >= 2 ? t.sidebar.searchInTextQ(q) : t.sidebar.searchInText}
+      <Search size={12} className="shrink-0" aria-hidden />
+      <span className="truncate">{q.length >= 2 ? t.sidebar.searchInTextQ(q) : t.sidebar.searchInText}</span>
     </button>
   );
 }
 
 function Empty({ text }: { text: string }) {
-  return <div className="px-4 py-6 text-center text-[12px] text-muted">{text}</div>;
+  return <div className="px-4 py-6 text-center text-[12px] leading-relaxed text-muted">{text}</div>;
 }
 
 // ---------------------------------------------------------------- Sidebar
@@ -511,14 +544,14 @@ export function Sidebar() {
     <aside data-sidebar className="flex h-full min-h-0 flex-col bg-surface" key={focusFilter}>
       <ActiveSection />
       <div className="shrink-0 px-2 pt-2">
-        <div className="flex rounded-[6px] bg-base p-0.5" role="tablist">
+        <div className="flex rounded-[6px] border border-line bg-base p-0.5" role="tablist">
           {tabs.map((x) => (
             <button
               key={x.id}
               role="tab"
               aria-selected={tab === x.id}
               data-sidebar-focus={x.id === tab ? '' : undefined}
-              className={`h-6 flex-1 rounded-[4px] text-[12px] ${tab === x.id ? 'bg-selected text-fg' : 'text-muted hover:text-fg'}`}
+              className={`h-6 flex-1 rounded-[4px] text-[12px] transition-colors duration-100 ${tab === x.id ? 'bg-selected font-semibold text-fg' : 'text-muted hover:bg-hover hover:text-fg'}`}
               onClick={() => {
                 sel().setLayout({ sidebarTab: x.id });
                 sel().set({ projectFilter: null });
@@ -529,8 +562,8 @@ export function Sidebar() {
           ))}
         </div>
         <div className="mt-1.5 flex items-center gap-1">
-          <div className="flex h-7 flex-1 items-center gap-1.5 rounded-[4px] border border-line-strong bg-base px-2 focus-within:border-accent">
-            <Search size={13} className="text-faint" />
+          <div className="flex h-7 flex-1 items-center gap-1.5 rounded-[4px] border border-control bg-base px-2 focus-within:border-accent focus-within:outline focus-within:outline-1 focus-within:outline-accent">
+            <Search size={13} className="text-faint" aria-hidden />
             <input
               data-filter
               value={filter}
@@ -541,11 +574,17 @@ export function Sidebar() {
                   document.querySelector<HTMLElement>('[data-list] [data-row]')?.focus();
               }}
               placeholder={t.sidebar.filter}
-              className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-faint"
+              aria-label={t.sidebar.filter}
+              className="min-w-0 flex-1 bg-transparent text-[13px] outline-none"
             />
             {filter && (
-              <button aria-label="Очистить фильтр" onClick={() => sel().set({ filter: '' })}>
-                <X size={12} className="text-muted" />
+              <button
+                aria-label={t.sidebar.clearFilter}
+                title={t.sidebar.clearFilter}
+                className="rounded-[4px] p-0.5 text-muted hover:bg-hover hover:text-fg"
+                onClick={() => sel().set({ filter: '' })}
+              >
+                <X size={12} aria-hidden />
               </button>
             )}
           </div>
@@ -553,11 +592,12 @@ export function Sidebar() {
             align="end"
             trigger={
               <button
-                aria-label="Создать"
-                className="rounded p-1 text-muted hover:bg-hover hover:text-fg disabled:opacity-40"
+                aria-label={t.sidebar.create}
+                title={t.sidebar.create}
+                className="flex h-7 w-7 items-center justify-center rounded-[6px] text-muted hover:bg-hover hover:text-fg active:bg-selected disabled:opacity-45"
                 disabled={!online}
               >
-                <Plus size={15} />
+                <Plus size={15} aria-hidden />
               </button>
             }
             items={[
@@ -566,11 +606,14 @@ export function Sidebar() {
             ]}
           />
         </div>
-        {stale && <div className="px-1 pt-1 text-[11px] text-faint">{t.sidebar.stale}</div>}
+        {stale && (
+          <div className="flex items-center gap-1.5 px-1 pt-1.5 text-[12px] text-faint" role="status">
+            <LoaderCircle size={11} className="anim-spin" aria-hidden />
+            {t.sidebar.stale}
+          </div>
+        )}
       </div>
-      <div
-        className={`flex min-h-0 flex-1 flex-col ${tab === 'projects' ? 'overflow-y-auto' : ''} ${stale ? 'opacity-60' : ''}`}
-      >
+      <div className={`flex min-h-0 flex-1 flex-col ${tab === 'projects' ? 'overflow-y-auto' : ''}`}>
         {tab === 'projects' && <ProjectList filter={filter} />}
         {tab === 'chats' && <ChatList archived={false} filter={filter} />}
         {tab === 'archive' && <ChatList archived filter={filter} />}

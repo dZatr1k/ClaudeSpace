@@ -24,18 +24,18 @@ async function patch(p: SettingsPatch) {
 
 function Row({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
-    <label className="flex items-start gap-3 py-1.5 text-[13px]">
-      <span className="w-56 shrink-0 pt-1 text-muted">{label}</span>
+    <label className="flex items-start gap-4 border-b border-line py-2.5 text-[13px] last:border-b-0">
+      <span className="w-52 shrink-0 pt-1 leading-snug">{label}</span>
       <span className="min-w-0 flex-1">
         {children}
-        {hint && <div className="mt-0.5 text-[12px] text-faint">{hint}</div>}
+        {hint && <div className="mt-1 text-[12px] leading-snug text-faint">{hint}</div>}
       </span>
     </label>
   );
 }
 
 const inputCls =
-  'h-7 w-full rounded-[4px] border border-line-strong bg-base px-2 text-[13px] outline-none focus:border-accent';
+  'h-7 w-full rounded-[4px] border border-control bg-base px-2 text-[13px] outline-none focus:border-accent focus:outline focus:outline-1 focus:outline-accent';
 
 function Text({
   value,
@@ -76,7 +76,7 @@ function Num({
   return (
     <input
       type="number"
-      className={`${inputCls} w-24`}
+      className={`${inputCls.replace('w-full', '')} w-24`}
       value={value}
       min={min}
       max={max}
@@ -101,7 +101,7 @@ function Toggle({
   return (
     <input
       type="checkbox"
-      className="mt-1.5 h-4 w-4 accent-[var(--accent)]"
+      className="mt-1 h-4 w-4 accent-[var(--accent)]"
       checked={checked}
       disabled={disabled}
       onChange={(e) => onChange(e.target.checked)}
@@ -119,12 +119,14 @@ function Choice<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex rounded-[6px] bg-base p-0.5">
+    <div className="inline-flex rounded-[6px] border border-line bg-base p-0.5" role="radiogroup">
       {options.map((o) => (
         <button
           key={o.v}
           type="button"
-          className={`h-6 rounded-[4px] px-3 text-[12px] ${value === o.v ? 'bg-selected text-fg' : 'text-muted hover:text-fg'}`}
+          role="radio"
+          aria-checked={value === o.v}
+          className={`h-6 rounded-[4px] px-3 text-[12px] transition-colors duration-100 ${value === o.v ? 'bg-selected font-semibold text-fg' : 'text-muted hover:bg-hover hover:text-fg'}`}
           onClick={() => onChange(o.v)}
         >
           {o.label}
@@ -145,22 +147,25 @@ function ThemeCard({
 }) {
   const half = (bg: string, fg: string, acc: string) => (
     <div className="flex h-full flex-1 flex-col gap-1 p-1.5" style={{ background: bg }}>
-      <div className="h-1.5 w-8 rounded" style={{ background: acc }} />
-      <div className="h-1 w-12 rounded" style={{ background: fg, opacity: 0.6 }} />
-      <div className="h-1 w-10 rounded" style={{ background: fg, opacity: 0.3 }} />
+      <div className="h-1.5 w-1.5 rotate-45" style={{ background: acc }} />
+      <div className="h-1 w-12 rounded" style={{ background: fg, opacity: 0.7 }} />
+      <div className="h-1 w-10 rounded" style={{ background: fg, opacity: 0.35 }} />
     </div>
   );
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={active}
       onClick={() => void patch({ appearance: { theme: id } })}
-      className={`flex w-28 flex-col overflow-hidden rounded-[6px] border-2 text-[12px] ${active ? 'border-accent' : 'border-line-strong'}`}
+      className={`flex w-28 flex-col overflow-hidden rounded-[6px] border-2 text-[12px] transition-colors duration-100 ${active ? 'border-accent' : 'border-line-strong hover:border-control'}`}
     >
+      {/* previews show both themes at once, so the colours are literal here (DESIGN §5.1) */}
       <div className="flex h-14">
-        {id !== 'light' && half('#0F1115', '#E6E8EB', '#D97757')}
-        {id !== 'dark' && half('#FBFBFC', '#1A1D21', '#C15F3C')}
+        {id !== 'light' && half('#121110', '#EDE9E4', '#D97757')}
+        {id !== 'dark' && half('#FBFAF8', '#1D1B19', '#B4532F')}
       </div>
-      <div className="bg-elevated py-1">{label}</div>
+      <div className={`bg-elevated py-1 ${active ? 'font-semibold' : ''}`}>{label}</div>
     </button>
   );
 }
@@ -187,7 +192,13 @@ function ConnectionSection({ s }: { s: S }) {
         <>
           <Row
             label={t.settings.host}
-            hint={hosts ? (hosts.found ? hosts.configPath : `нет файла ${hosts.configPath}`) : undefined}
+            hint={
+              hosts
+                ? hosts.found
+                  ? t.settings.hostFile(hosts.configPath)
+                  : t.settings.hostNoFile(hosts.configPath)
+                : undefined
+            }
           >
             <div className="flex gap-2">
               <select
@@ -210,21 +221,21 @@ function ConnectionSection({ s }: { s: S }) {
               </select>
             </div>
             {hosts?.resolved && !manual && (
-              <div className="mt-1 text-[12px] text-muted">
+              <div className="mono mt-1 text-[12px] text-muted">
                 {hosts.resolved.user}@{hosts.resolved.hostname}:{hosts.resolved.port} ·{' '}
-                {hosts.resolved.identityFile ?? 'ключ по умолчанию'}
+                {hosts.resolved.identityFile ?? t.settings.defaultKey}
               </div>
             )}
           </Row>
           {manual && (
             <>
-              <Row label="Хост">
+              <Row label={t.settings.manualHost}>
                 <Text
                   value={manual.hostname}
                   onCommit={(v) => void patch({ connection: { manual: { ...manual, hostname: v } } })}
                 />
               </Row>
-              <Row label="Порт">
+              <Row label={t.settings.manualPort}>
                 <Num
                   value={manual.port}
                   min={1}
@@ -232,13 +243,13 @@ function ConnectionSection({ s }: { s: S }) {
                   onCommit={(v) => void patch({ connection: { manual: { ...manual, port: v } } })}
                 />
               </Row>
-              <Row label="Пользователь">
+              <Row label={t.settings.manualUser}>
                 <Text
                   value={manual.user}
                   onCommit={(v) => void patch({ connection: { manual: { ...manual, user: v } } })}
                 />
               </Row>
-              <Row label="Ключ">
+              <Row label={t.settings.manualKey}>
                 <Text
                   value={manual.keyPath}
                   placeholder="~/.ssh/id_ed25519"
@@ -267,7 +278,7 @@ function NotificationsSection({ s }: { s: S }) {
   useEffect(() => setVol(n.volume), [n.volume]);
   return (
     <>
-      <div className="mb-2 text-[12px] text-faint">{t.settings.notifyHint}</div>
+      <div className="mb-1 text-[12px] leading-snug text-muted">{t.settings.notifyHint}</div>
       <Row label={t.settings.notifySystem}>
         <Toggle checked={n.system} onChange={(v) => void patch({ notifications: { system: v } })} />
       </Row>
@@ -292,15 +303,15 @@ function NotificationsSection({ s }: { s: S }) {
             onPointerUp={() => vol !== n.volume && void patch({ notifications: { volume: vol } })}
             onKeyUp={() => vol !== n.volume && void patch({ notifications: { volume: vol } })}
           />
-          <span className="w-10 text-[12px] text-muted">{Math.round(vol * 100)}%</span>
+          <span className="tnum w-10 text-[12px] text-muted">{Math.round(vol * 100)}%</span>
           <Button
             small
             onClick={() => {
               // test both parts: the toast (if enabled) and the sound (file or chime)
-              if (n.toast) useUi.getState().toast(t.notify.waiting('Проверка'), 'info');
+              if (n.toast) useUi.getState().toast(t.notify.waiting(t.settings.notifyTestName), 'info');
               if (n.system)
                 void invoke('notify.show', {
-                  title: t.notify.waiting('Проверка'),
+                  title: t.notify.waiting(t.settings.notifyTestName),
                   body: t.notify.systemBody,
                   session: '',
                 }).then((r) => !r.ok && useUi.getState().toast(t.settings.notifySystemFailed, 'error'));
@@ -318,7 +329,7 @@ function NotificationsSection({ s }: { s: S }) {
       </Row>
       <Row label={t.settings.notifyFile} hint={t.settings.notifyFileHint}>
         <input
-          className={`${inputCls} w-80`}
+          className={`${inputCls.replace('w-full', '')} w-80`}
           placeholder="%USERPROFILE%\\.claude\\sounds\\sound.wav"
           defaultValue={n.soundFile}
           disabled={!n.sound}
@@ -351,7 +362,7 @@ function PcLinkSection({ s }: { s: S }) {
   const valid = SRC_RE.test(src.trim()) && DST_RE.test(dst.trim());
   return (
     <>
-      <div className="mb-2 text-[12px] text-faint">{t.pclink.hint}</div>
+      <div className="mb-1 text-[12px] leading-snug text-muted">{t.pclink.hint}</div>
       <Row label={t.pclink.state}>
         <span className="flex items-center gap-2 pt-1">
           <span>{pcLinkText(st)}</span>
@@ -393,14 +404,14 @@ function PcLinkSection({ s }: { s: S }) {
           ))}
           <div className="flex items-center gap-2">
             <input
-              className={`${inputCls} w-40`}
+              className={`${inputCls.replace('w-full', '')} w-40`}
               placeholder={t.pclink.srcPh}
               value={src}
               onChange={(e) => setSrc(e.target.value)}
             />
             <span>→</span>
             <input
-              className={`${inputCls} w-40`}
+              className={`${inputCls.replace('w-full', '')} w-40`}
               placeholder={t.pclink.dstPh}
               value={dst}
               onChange={(e) => setDst(e.target.value)}
@@ -465,7 +476,7 @@ function SudoSection({ s }: { s: S }) {
       </Row>
       <Row label={t.askpass.envLine} hint={t.askpass.envHint}>
         <span className="flex items-center gap-2">
-          <code className="selectable min-w-0 flex-1 truncate rounded bg-base px-2 py-1 font-mono text-[12px]">
+          <code className="selectable min-w-0 flex-1 truncate rounded-[4px] border border-line bg-base px-2 py-1 font-mono text-[12px]">
             {ASKPASS_ENV_LINE}
           </code>
           <Button
@@ -524,23 +535,27 @@ function AboutSection({ s }: { s: S }) {
   const [log, setLog] = useState<string[] | null>(null);
   return (
     <>
-      <Row label={t.settings.version}>{info?.version}</Row>
+      <Row label={t.settings.version}>
+        <span className="mono">{info?.version}</span>
+      </Row>
       <UpdatesRows s={s} />
       <Row label={t.settings.agent}>
-        {info?.agentVersion}{' '}
+        <span className="mono">{info?.agentVersion}</span>{' '}
         <span className="font-mono text-[11px] text-faint">{info?.agentHash.slice(0, 19)}…</span>
       </Row>
-      <Row label={t.settings.protocol}>{info?.protocol}</Row>
+      <Row label={t.settings.protocol}>
+        <span className="mono">{info?.protocol}</span>
+      </Row>
       <Row label={t.settings.userData}>
         <span className="selectable font-mono text-[12px]">{info?.userData}</span>
       </Row>
       <Row label={t.settings.logs}>
         <Button small onClick={() => void invoke('conn.log').then(setLog)}>
-          Показать
+          {t.actions.show}
         </Button>
       </Row>
       {log && (
-        <pre className="selectable max-h-60 overflow-auto rounded bg-base p-2 font-mono text-[11px]">
+        <pre className="selectable max-h-60 overflow-auto rounded-[6px] border border-line bg-base p-3 font-mono text-[11px]">
           {log.join('\n')}
         </pre>
       )}
@@ -570,12 +585,13 @@ export function SettingsOverlay() {
       title={t.settings.title}
       width={820}
     >
-      <div className="flex min-h-[440px] gap-4">
+      <div className="flex min-h-[440px] gap-5">
         <nav className="flex w-40 shrink-0 flex-col gap-0.5 border-r border-line pr-3">
           {nav.map((x) => (
             <button
               key={x.id}
-              className={`h-8 rounded px-2 text-left text-[13px] ${section === x.id ? 'bg-selected' : 'hover:bg-hover'}`}
+              aria-current={section === x.id ? 'page' : undefined}
+              className={`relative h-8 rounded-[6px] px-2.5 text-left text-[13px] transition-colors duration-100 ${section === x.id ? 'bg-selected font-semibold' : 'text-muted hover:bg-hover hover:text-fg'}`}
               onClick={() => useUi.getState().set({ settingsOpen: x.id })}
             >
               {x.label}
@@ -589,7 +605,7 @@ export function SettingsOverlay() {
           {section === 'appearance' && (
             <>
               <Row label={t.settings.theme}>
-                <div className="flex gap-2">
+                <div className="flex gap-2" role="radiogroup" aria-label={t.settings.theme}>
                   <ThemeCard
                     id="system"
                     label={t.settings.themeSystem}
@@ -716,7 +732,7 @@ export function SettingsOverlay() {
                   onChange={(v) => void patch({ terminal: { warnMultilinePaste: v } })}
                 />
               </Row>
-              <div className="mt-2 text-[12px] text-faint">{t.settings.themeHint}</div>
+              <div className="mt-3 text-[12px] leading-snug text-muted">{t.settings.themeHint}</div>
             </>
           )}
           {section === 'notifications' && <NotificationsSection s={s} />}
@@ -746,7 +762,7 @@ export function SettingsOverlay() {
                   onCommit={(v) => void patch({ integrations: { vscodeCommand: v } })}
                 />
               </Row>
-              <Row label={t.settings.remoteHost}>
+              <Row label={t.settings.remoteHost} hint={t.settings.remoteHostHint}>
                 <Text
                   value={s.integrations.remoteHost}
                   placeholder={s.connection.host}

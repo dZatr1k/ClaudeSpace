@@ -85,10 +85,10 @@ def norm_dst(raw, must_be_free=True):
         raise WinfsError('not_allowed', 'папка на VM ведёт за пределы домашней папки')
     if must_be_free and not is_mounted(p) and os.path.lexists(p):
         if os.path.islink(p) or not os.path.isdir(p):
-            raise WinfsError('exists', f'{paths.short_path(p)} — не папка')
+            raise WinfsError('exists', f'{paths.short_path(p)} не папка')
         try:
             if os.listdir(p):
-                raise WinfsError('exists', f'папка {paths.short_path(p)} не пуста — подключать туда нельзя')
+                raise WinfsError('exists', f'папка {paths.short_path(p)} не пуста, подключать туда нельзя')
         except OSError as e:
             raise WinfsError('not_allowed', f'нет доступа к {paths.short_path(p)}: {e.strerror}')
     return p

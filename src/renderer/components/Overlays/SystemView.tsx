@@ -1,4 +1,4 @@
-import { Cpu, Gauge, RefreshCw, Stethoscope } from 'lucide-react';
+import { Cpu, Gauge, RefreshCw, Stethoscope, WifiOff } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import type { Doctor, SystemStats, Usage } from '@shared/model';
 import { agent } from '../../bridge';
@@ -38,14 +38,17 @@ function UsagePane() {
   useEffect(() => {
     if (online) void load(60);
   }, [online, load]);
-  if (!u) return <div className="text-muted">{err ? t.info.failed(err) : t.info.loading}</div>;
+  if (!u)
+    return (
+      <div className="text-muted" role="status">
+        {err ? t.info.failed(err) : t.info.loading}
+      </div>
+    );
   if (!u.ok)
     return (
       <div className="space-y-2">
-        <div>
-          {u.error === 'ccusage не установлен' ? t.system.noCcusage : (u.error ?? 'ccusage не ответил')}
-        </div>
-        <code className="selectable rounded bg-hover px-2 py-1 font-mono text-[12px]">
+        <div>{u.error === 'ccusage не установлен' ? t.system.noCcusage : (u.error ?? t.system.noAnswer)}</div>
+        <code className="selectable inline-block rounded-[4px] border border-line bg-base px-2 py-1 font-mono text-[12px]">
           {t.system.ccusageInstall}
         </code>
       </div>
@@ -54,7 +57,7 @@ function UsagePane() {
   return (
     <div className="space-y-4 text-[13px]">
       <div>
-        <div className="mb-1 font-semibold">{t.system.usageWindow}</div>
+        <h3 className="mb-1.5 text-[13px] font-semibold">{t.system.usageWindow}</h3>
         {u.block ? (
           <div className="space-y-0.5 text-muted tnum">
             <div>
@@ -62,7 +65,7 @@ function UsagePane() {
               {t.system.left} {formatLeft(u.block.leftMin)} · {t.system.apiCost(u.block.costUsd.toFixed(2))}
             </div>
             <div>
-              {t.system.models}: {u.block.models.join(', ') || '—'}
+              {t.system.models}: {u.block.models.join(', ') || t.system.noModels}
             </div>
           </div>
         ) : (
@@ -70,13 +73,13 @@ function UsagePane() {
         )}
       </div>
       <div>
-        <div className="mb-1 font-semibold">{t.system.week}</div>
+        <h3 className="mb-1.5 text-[13px] font-semibold">{t.system.week}</h3>
         {u.days.map((d) => (
           <div key={d.day} className="flex items-center gap-2 tnum text-[12px]">
             <span className="w-12 text-muted">{d.day.slice(5)}</span>
-            <div className="h-3 flex-1">
+            <div className="h-3 flex-1 rounded-[3px] bg-hover">
               <div
-                className="h-3 rounded-sm bg-accent/70"
+                className="h-3 rounded-[3px] bg-accent"
                 style={{ width: `${Math.max(1, (100 * d.tokens) / max)}%` }}
               />
             </div>
@@ -87,11 +90,11 @@ function UsagePane() {
           {t.system.total} {formatTokens(u.weekTokens)}
         </div>
       </div>
-      <div className="text-[12px] text-faint">{t.system.usageNote}</div>
+      <div className="text-[12px] leading-snug text-muted">{t.system.usageNote}</div>
       <div className="flex items-center gap-2 text-[12px] text-muted">
         {t.system.updated(hhmm(u.at))}
         <Button small onClick={() => void load(0)} disabled={busy || !online}>
-          <RefreshCw size={12} className={busy ? 'anim-spin' : ''} />
+          <RefreshCw size={12} className={busy ? 'anim-spin' : ''} aria-hidden />
           {t.system.refresh}
         </Button>
       </div>
@@ -127,20 +130,25 @@ function DoctorPane() {
   }, [online, load]);
   if (!d)
     return (
-      <div className="text-muted">{err ? t.info.failed(err) : busy ? t.info.loading : t.system.offline}</div>
+      <div className="text-muted" role="status">
+        {err ? t.info.failed(err) : busy ? t.info.loading : t.system.offline}
+      </div>
     );
   return (
     <div className="space-y-4 text-[13px]">
       <div>
-        Claude Code <b>{d.claudeVersion ?? '?'}</b> · {t.system.knownGood} {d.knownGood ?? '—'} ·{' '}
-        <span className={LV[d.level]}>{t.system.doctorLevel[d.level]}</span>
-        {d.problems.length > 0 && <div className="text-[12px] text-st-waiting">{d.problems.join('; ')}</div>}
+        Claude Code <b className="mono">{d.claudeVersion ?? '?'}</b> · {t.system.knownGood}{' '}
+        <span className="mono">{d.knownGood ?? t.system.noModels}</span> ·{' '}
+        <span className={`font-semibold ${LV[d.level]}`}>{t.system.doctorLevel[d.level]}</span>
+        {d.problems.length > 0 && (
+          <div className="mt-1 text-[12px] text-st-waiting">{d.problems.join('; ')}</div>
+        )}
       </div>
       <table className="w-full text-[12px]">
         <tbody>
           {d.fields.map((f) => (
             <tr key={f.key} className="border-b border-line">
-              <td className={`w-12 py-0.5 font-mono ${LV[f.level]}`}>{f.level.toUpperCase()}</td>
+              <td className={`w-12 py-1 font-mono font-semibold ${LV[f.level]}`}>{f.level.toUpperCase()}</td>
               <td>{f.label}</td>
               <td className="text-muted tnum">
                 {t.system.found(f.found, f.total)}
@@ -151,26 +159,28 @@ function DoctorPane() {
         </tbody>
       </table>
       <div>
-        <div className="mb-0.5 font-semibold">{t.system.registry}</div>
+        <h3 className="mb-1 text-[13px] font-semibold">{t.system.registry}</h3>
         <div className="text-[12px] text-muted">
           {t.system.live(d.registry.live)}
-          {d.registry.missing.length ? `, нет полей: ${d.registry.missing.join(', ')}` : ''}
+          {d.registry.missing.length ? t.system.missing(d.registry.missing.join(', ')) : ''}
         </div>
       </div>
       <div>
-        <div className="mb-0.5 font-semibold">{t.system.tools}</div>
+        <h3 className="mb-1 text-[13px] font-semibold">{t.system.tools}</h3>
         {d.tools.map((x) => (
           <div key={x.name} className="flex gap-2 text-[12px]">
-            <span className={`w-10 font-mono ${x.ok ? LV.ok : x.name === 'fzf' ? 'text-faint' : LV.warn}`}>
-              {x.ok ? 'OK' : 'нет'}
+            <span
+              className={`w-10 font-mono font-semibold ${x.ok ? LV.ok : x.name === 'fzf' ? 'text-faint' : LV.warn}`}
+            >
+              {x.ok ? 'OK' : t.system.toolMissing}
             </span>
-            <span className="w-32">{x.name}</span>
-            <span className="min-w-0 flex-1 truncate text-muted">{x.detail}</span>
+            <span className="mono w-32">{x.name}</span>
+            <span className="mono min-w-0 flex-1 truncate text-muted">{x.detail}</span>
           </div>
         ))}
       </div>
       <Button small onClick={() => void load()} disabled={busy || !online}>
-        <RefreshCw size={12} className={busy ? 'anim-spin' : ''} />
+        <RefreshCw size={12} className={busy ? 'anim-spin' : ''} aria-hidden />
         {t.system.checkAgain}
       </Button>
     </div>
@@ -197,11 +207,21 @@ function ResourcesPane() {
     const id = setInterval(() => void load(), 5000);
     return () => clearInterval(id);
   }, [online, load]);
-  if (!s) return <div className="text-muted">{t.system.offline}</div>;
+  if (!s)
+    return (
+      <div className="text-muted" role="status">
+        {online ? t.info.loading : t.system.offline}
+      </div>
+    );
   const stale = mosh.filter((m) => !m.current);
   return (
     <div className="space-y-4 text-[13px]">
-      {!online && <div className="text-st-error">{t.system.offline}</div>}
+      {!online && (
+        <div className="flex items-center gap-1.5 text-st-error" role="status">
+          <WifiOff size={13} aria-hidden />
+          {t.system.offline}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-x-6 gap-y-1 tnum text-[12px]">
         <div>
           {t.system.load}: {s.load.map((x) => x.toFixed(2)).join(' ')}
@@ -226,7 +246,7 @@ function ResourcesPane() {
       </div>
       {s.top && (
         <div>
-          <div className="mb-0.5 font-semibold">{t.system.topProcs}</div>
+          <h3 className="mb-1 text-[13px] font-semibold">{t.system.topProcs}</h3>
           <table className="w-full font-mono text-[11px]">
             <tbody>
               {s.top.map((p) => (
@@ -242,7 +262,7 @@ function ResourcesPane() {
         </div>
       )}
       <div>
-        <div className="mb-0.5 font-semibold">{t.system.mosh}</div>
+        <h3 className="mb-1 text-[13px] font-semibold">{t.system.mosh}</h3>
         {mosh.length === 0 && <div className="text-[12px] text-muted">{t.system.moshNone}</div>}
         {mosh.map((m) => (
           <div key={m.pid} className="flex gap-3 font-mono text-[11px]">
@@ -265,7 +285,7 @@ function ResourcesPane() {
                   confirm: t.system.moshKill(stale.length),
                   onConfirm: async () => {
                     const r = await agent('mosh_kill_stale');
-                    useUi.getState().toast(`Закрыто: ${r.killed}`, 'success');
+                    useUi.getState().toast(t.toasts.closedMosh(r.killed), 'success');
                     void load();
                   },
                 },
@@ -285,22 +305,23 @@ export function SystemView() {
   const doctor = useData((d) => d.doctor);
   if (!section) return null;
   const items: { id: SystemSection; label: string; icon: React.ReactNode }[] = [
-    { id: 'usage', label: t.actions.usage, icon: <Gauge size={14} /> },
+    { id: 'usage', label: t.actions.usage, icon: <Gauge size={14} aria-hidden /> },
     {
       id: 'doctor',
       label: t.actions.doctor + (doctor && doctor.level !== 'ok' ? ' ⚠' : ''),
-      icon: <Stethoscope size={14} />,
+      icon: <Stethoscope size={14} aria-hidden />,
     },
-    { id: 'resources', label: t.actions.resources, icon: <Cpu size={14} /> },
+    { id: 'resources', label: t.actions.resources, icon: <Cpu size={14} aria-hidden /> },
   ];
   return (
     <Modal open onClose={() => useUi.getState().set({ system: null })} title={t.system.title} width={760}>
-      <div className="flex min-h-[420px] gap-4">
+      <div className="flex min-h-[420px] gap-5">
         <nav className="flex w-36 shrink-0 flex-col gap-0.5 border-r border-line pr-3">
           {items.map((x) => (
             <button
               key={x.id}
-              className={`flex h-8 items-center gap-2 rounded px-2 text-left text-[13px] ${section === x.id ? 'bg-selected' : 'hover:bg-hover'}`}
+              aria-current={section === x.id ? 'page' : undefined}
+              className={`flex h-8 items-center gap-2 rounded-[6px] px-2.5 text-left text-[13px] transition-colors duration-100 ${section === x.id ? 'bg-selected font-semibold' : 'text-muted hover:bg-hover hover:text-fg'}`}
               onClick={() => useUi.getState().set({ system: x.id })}
             >
               {x.icon}

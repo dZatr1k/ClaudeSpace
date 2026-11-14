@@ -102,6 +102,11 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await win.keyboard.type('echo привет ─│┌ ✻');
   await expect(win.locator('.xterm-rows').first()).toContainText('привет ─│┌ ✻', { timeout: 5000 });
   await win.screenshot({ path: join(SHOTS, '04-terminal.png') });
+  // narrow window (minimum size): the right panel hides itself, the tab strip and the status bar must still fit
+  await win.setViewportSize({ width: 960, height: 600 });
+  await win.waitForTimeout(300);
+  await win.screenshot({ path: join(SHOTS, '12-narrow.png') });
+  await win.setViewportSize({ width: 1440, height: 900 });
 
   // right panel for the session: Claude registered for its pane -> chat title, status, last prompt (no screen copy)
   const [paneId, panePid] = tmux('list-panes', '-t', '=Alpha', '-F', '#{pane_id} #{pane_pid}')
@@ -127,6 +132,9 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await expect(info.locator('[data-last-prompt]')).toHaveText('почини сборку');
   await expect(info).toContainText('только это окно');
   await win.screenshot({ path: join(SHOTS, '09-session-info.png') });
+  await setTheme(win, 'light');
+  await win.screenshot({ path: join(SHOTS, '13-session-light.png') });
+  await setTheme(win, 'dark');
   // chat title -> the chat in the «Чаты» list, selected
   await info.getByTitle('Показать в списке чатов').click();
   await expect(win.getByRole('tab', { name: 'Чаты' })).toHaveAttribute('aria-selected', 'true');
@@ -204,6 +212,7 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   // debug drop: offline overlay, then automatic reconnect + reattach
   await win.evaluate(() => window.cs.invoke('conn.debugDrop'));
   await expect(win.getByText('Нет связи с VM').first()).toBeVisible({ timeout: 10_000 });
+  await win.waitForTimeout(250); // let the state card finish its entry motion (DESIGN §5.6)
   await win.screenshot({ path: join(SHOTS, '08-offline.png') });
   await expect(win.locator('[data-term-state="live"]')).toBeVisible({ timeout: 30_000 });
 
@@ -220,6 +229,7 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await expect(win.locator('[data-term-state="live"]')).toBeVisible({ timeout: 30_000 });
   tmux('kill-session', '-t', `=${name}`);
   await expect(win.getByText(`Сессия «${name}» завершена`)).toBeVisible({ timeout: 15_000 });
+  await win.waitForTimeout(250); // entry motion of the state card
   await win.screenshot({ path: join(SHOTS, '09-session-ended.png') });
   expect(first.errors.filter((e) => !/Autofill|DevTools/.test(e))).toEqual([]);
   expect(errors.filter((e) => !/Autofill|DevTools/.test(e))).toEqual([]);

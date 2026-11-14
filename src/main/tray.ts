@@ -21,7 +21,7 @@ export function connLine(s: ConnState): string {
     case 'offline':
       return 'VM: нет связи, переподключение…';
     case 'needs-user':
-      return 'VM: требуется действие (откройте окно)';
+      return 'VM: требуется действие, откройте окно';
     default:
       return 'VM: отключено';
   }

@@ -1,4 +1,4 @@
-import { LoaderCircle, WifiOff } from 'lucide-react';
+import { CircleAlert, CircleCheck, CircleStop, LoaderCircle, Unplug, WifiOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Tab } from '@shared/model';
 import * as A from '../../actions';
@@ -14,11 +14,30 @@ import { Button } from '../ui/Button';
 import { ContextMenu } from '../ui/Menu';
 import { createHandle, getHandle, mountHandle, openChannel, safeFit, writeToTab } from './controller';
 
-function Overlay({ children, dim = true }: { children: React.ReactNode; dim?: boolean }) {
+/** A state card over the terminal: icon (shape carries the state), title, one line of why, actions. */
+function Overlay({
+  children,
+  dim = true,
+  icon,
+  title,
+  hint,
+}: {
+  children?: React.ReactNode;
+  dim?: boolean;
+  icon?: React.ReactNode;
+  title: React.ReactNode;
+  hint?: React.ReactNode;
+}) {
   return (
-    <div className={`absolute inset-0 z-10 flex items-center justify-center ${dim ? 'bg-base/50' : ''}`}>
-      <div className="flex max-w-md flex-col items-center gap-3 rounded-[8px] border border-line-strong bg-elevated px-5 py-4 text-center shadow-float">
-        {children}
+    <div className={`absolute inset-0 z-10 flex items-center justify-center p-6 ${dim ? 'bg-base/60' : ''}`}>
+      <div
+        role="status"
+        className="anim-rise flex w-[380px] max-w-full flex-col items-center gap-2 rounded-[10px] border border-line-strong bg-elevated px-6 py-5 text-center shadow-modal"
+      >
+        {icon && <div className="mb-1">{icon}</div>}
+        <div className="text-[14px] font-semibold">{title}</div>
+        {hint && <div className="text-[12px] leading-relaxed text-muted selectable">{hint}</div>}
+        {children && <div className="mt-2 flex flex-wrap justify-center gap-2">{children}</div>}
       </div>
     </div>
   );
@@ -42,11 +61,21 @@ function TermOverlay({ tab }: { tab: Tab }) {
   const name = tab.session ?? tab.title;
   if (conn.kind !== 'online' || tab.term === 'offline') {
     return (
-      <Overlay>
-        <WifiOff size={20} className="text-st-error" />
-        <div className="font-medium">{t.term.offline}</div>
-        {conn.kind === 'offline' && <div className="tnum text-[12px] text-muted">{t.conn.retryIn(left)}</div>}
-        {conn.kind === 'connecting' && <div className="text-[12px] text-muted">{t.conn.connecting}</div>}
+      <Overlay
+        icon={<WifiOff size={22} className="text-st-error" aria-hidden />}
+        title={t.term.offline}
+        hint={
+          <>
+            {conn.kind === 'offline' && (
+              <span className="tnum block font-medium text-fg">{t.conn.retryIn(left)}</span>
+            )}
+            {conn.kind === 'connecting' && (
+              <span className="block font-medium text-fg">{t.conn.connecting}</span>
+            )}
+            {t.term.offlineHint}
+          </>
+        }
+      >
         <Button small onClick={() => void invoke('conn.retryNow')}>
           {t.conn.now}
         </Button>
@@ -56,46 +85,51 @@ function TermOverlay({ tab }: { tab: Tab }) {
   switch (tab.term) {
     case 'connecting':
       return (
-        <Overlay dim={false}>
-          <LoaderCircle size={18} className="anim-spin text-muted" />
-          <div className="text-[13px]">{t.term.connecting(name)}</div>
-        </Overlay>
+        <Overlay
+          dim={false}
+          icon={<LoaderCircle size={20} className="anim-spin text-st-busy" aria-hidden />}
+          title={t.term.connecting(name)}
+        />
       );
     case 'error':
       return (
-        <Overlay>
-          <div className="font-medium text-st-error">{t.term.error}</div>
-          <div className="text-[12px] text-muted selectable">{tab.error}</div>
-          <div className="flex gap-2">
-            <Button small variant="primary" onClick={() => void openChannel(tab.id)}>
-              {t.actions.retry}
-            </Button>
-            <Button small onClick={() => A.closeTab(tab.id)}>
-              {t.actions.closeTab}
-            </Button>
-          </div>
+        <Overlay
+          icon={<CircleAlert size={22} className="text-st-error" aria-hidden />}
+          title={t.term.error}
+          hint={tab.error}
+        >
+          <Button small variant="primary" onClick={() => void openChannel(tab.id)}>
+            {t.actions.retry}
+          </Button>
+          <Button small onClick={() => A.closeTab(tab.id)}>
+            {t.actions.closeTab}
+          </Button>
         </Overlay>
       );
     case 'detached':
       return (
-        <Overlay>
-          <div className="font-medium">{t.term.detached(name)}</div>
-          <div className="flex gap-2">
-            <Button small variant="primary" onClick={() => void openChannel(tab.id)}>
-              {t.actions.reconnectTab}
-            </Button>
-            <Button small onClick={() => A.closeTab(tab.id)}>
-              {t.actions.closeTab}
-            </Button>
-          </div>
+        <Overlay
+          icon={<Unplug size={22} className="text-muted" aria-hidden />}
+          title={t.term.detached(name)}
+          hint={t.term.detachedHint}
+        >
+          <Button small variant="primary" onClick={() => void openChannel(tab.id)}>
+            {t.actions.reconnectTab}
+          </Button>
+          <Button small onClick={() => A.closeTab(tab.id)}>
+            {t.actions.closeTab}
+          </Button>
         </Overlay>
       );
     case 'ended': {
       const chat = tab.chatId ? chats[tab.chatId] : undefined;
       return (
-        <Overlay>
-          <div className="font-medium">{t.term.ended(name)}</div>
-          <div className="flex gap-2">
+        <Overlay
+          icon={<CircleStop size={22} className="text-st-error" aria-hidden />}
+          title={t.term.ended(name)}
+          hint={t.term.endedHint}
+        >
+          <>
             {chat && (
               <Button
                 small
@@ -111,7 +145,7 @@ function TermOverlay({ tab }: { tab: Tab }) {
             <Button small onClick={() => A.closeTab(tab.id)}>
               {t.actions.closeTab}
             </Button>
-          </div>
+          </>
         </Overlay>
       );
     }
@@ -119,11 +153,18 @@ function TermOverlay({ tab }: { tab: Tab }) {
       if (tab.kind === 'clone') {
         const ok = tab.exitCode === 0;
         return (
-          <Overlay dim={false}>
-            <div className={`font-medium ${ok ? 'text-st-idle' : 'text-st-error'}`}>
-              {ok ? t.term.cloneDone : t.term.cloneFailed(tab.exitCode ?? null)}
-            </div>
-            <div className="flex gap-2">
+          <Overlay
+            dim={false}
+            icon={
+              ok ? (
+                <CircleCheck size={22} className="text-st-idle" aria-hidden />
+              ) : (
+                <CircleAlert size={22} className="text-st-error" aria-hidden />
+              )
+            }
+            title={ok ? t.term.cloneDone : t.term.cloneFailed(tab.exitCode ?? null)}
+          >
+            <>
               {ok && tab.dest && (
                 <Button
                   small
@@ -139,25 +180,23 @@ function TermOverlay({ tab }: { tab: Tab }) {
               <Button small onClick={() => A.closeTab(tab.id)}>
                 {t.actions.closeTab}
               </Button>
-            </div>
+            </>
           </Overlay>
         );
       }
       return (
-        <Overlay dim={false}>
-          <div className="font-medium">
-            {tab.error
-              ? `${t.term.exited(tab.exitCode ?? null)}: ${tab.error}`
-              : t.term.exited(tab.exitCode ?? null)}
-          </div>
-          <div className="flex gap-2">
-            <Button small variant="primary" onClick={() => void openChannel(tab.id)}>
-              {t.actions.retry}
-            </Button>
-            <Button small onClick={() => A.closeTab(tab.id)}>
-              {t.actions.closeTab}
-            </Button>
-          </div>
+        <Overlay
+          dim={false}
+          icon={<CircleStop size={22} className="text-muted" aria-hidden />}
+          title={t.term.exited(tab.exitCode ?? null)}
+          hint={tab.error}
+        >
+          <Button small variant="primary" onClick={() => void openChannel(tab.id)}>
+            {t.actions.retry}
+          </Button>
+          <Button small onClick={() => A.closeTab(tab.id)}>
+            {t.actions.closeTab}
+          </Button>
         </Overlay>
       );
     default:
@@ -264,8 +303,8 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }) {
       <ContextMenu items={menu}>
         <div
           ref={hostRef}
-          className="h-full w-full"
-          style={{ opacity: dimmed ? 0.5 : 1, background: 'var(--bg-base)' }}
+          style={{ opacity: dimmed ? 0.45 : 1, background: 'var(--bg-base)' }}
+          className="h-full w-full transition-opacity duration-200"
         />
       </ContextMenu>
       {active && <TermOverlay tab={tab} />}

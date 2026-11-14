@@ -1,12 +1,17 @@
 import {
   Archive,
+  CircleAlert,
   Code,
   Copy,
   ExternalLink,
+  FileCheck,
   GitBranch,
   MessageSquare,
+  MoreHorizontal,
+  Pencil,
   Plus,
   SquareTerminal,
+  Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -63,32 +68,40 @@ function useAgentLoad<T>(key: string | null, fn: () => Promise<T>, deps: unknown
   return [st, () => setN((x) => x + 1)];
 }
 
-function Field({ k, v }: { k: string; v: React.ReactNode }) {
+function Field({ k, v, mono }: { k: string; v: React.ReactNode; mono?: boolean }) {
   return (
-    <div className="flex gap-2 text-[12px]">
+    <div className="flex gap-3 py-[1px] text-[12px] leading-5">
       <span className="w-20 shrink-0 text-muted">{k}</span>
-      <span className="min-w-0 flex-1 break-words selectable">{v}</span>
+      <span className={`min-w-0 flex-1 break-words selectable ${mono ? 'mono' : ''}`}>{v}</span>
     </div>
   );
 }
 
 function Skeleton() {
   return (
-    <div className="space-y-2 p-3" aria-label={t.info.loading}>
+    <div className="space-y-2 p-4" role="status" aria-label={t.info.loading}>
       {[80, 60, 70, 40].map((w, i) => (
-        <div key={i} className="h-3 animate-pulse rounded bg-hover" style={{ width: `${w}%` }} />
+        <div
+          key={i}
+          className="h-3 rounded-[4px] bg-hover motion-safe:animate-pulse"
+          style={{ width: `${w}%` }}
+        />
       ))}
+      <div className="pt-1 text-[12px] text-faint">{t.info.loading}</div>
     </div>
   );
 }
 
 function ErrorLine({ message, retry }: { message: string; retry: () => void }) {
   return (
-    <div className="p-3 text-[12px]">
-      <span className="text-st-error">{t.info.failed(message)}</span>{' '}
-      <button className="text-accent hover:underline" onClick={retry}>
-        {t.actions.retry}
-      </button>
+    <div className="flex items-start gap-2 p-4 text-[12px]" role="alert">
+      <CircleAlert size={14} className="mt-0.5 shrink-0 text-st-error" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="text-fg">{t.info.failed(message)}</span>{' '}
+        <button className="font-medium text-accent-text hover:underline" onClick={retry}>
+          {t.actions.retry}
+        </button>
+      </span>
     </div>
   );
 }
@@ -104,10 +117,10 @@ function ChatInfo({ chat }: { chat: Chat }) {
   const c = chat;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="space-y-1 border-b border-line p-3">
-        <div className="mb-1 text-[14px] font-semibold leading-snug selectable">{c.title}</div>
-        <Field k={t.info.folder} v={shortPath(c.project, home)} />
-        {c.branch && <Field k={t.info.branch} v={<span className="text-git">{c.branch}</span>} />}
+      <div className="border-b border-line p-4">
+        <div className="mb-2 text-[14px] font-semibold leading-snug selectable">{c.title}</div>
+        <Field k={t.info.folder} v={shortPath(c.project, home)} mono />
+        {c.branch && <Field k={t.info.branch} v={<span className="text-git">{c.branch}</span>} mono />}
         <Field k={t.info.started} v={formatWhen(c.firstAt)} />
         <Field k={t.info.last} v={`${formatWhen(c.lastAt)} (${formatAgo(c.lastAt)})`} />
         <Field
@@ -118,8 +131,8 @@ function ChatInfo({ chat }: { chat: Chat }) {
               {c.promptsApprox ? '+' : ''}
               {c.linesAdded != null && (
                 <span className="ml-2 text-muted">
-                  {t.info.lines} <span className="text-st-idle">+{c.linesAdded}</span>{' '}
-                  <span className="text-st-error">−{c.linesRemoved}</span>
+                  {t.info.lines} <span className="tnum text-st-idle">+{c.linesAdded}</span>{' '}
+                  <span className="tnum text-st-error">−{c.linesRemoved}</span>
                 </span>
               )}
             </>
@@ -135,12 +148,12 @@ function ChatInfo({ chat }: { chat: Chat }) {
               title={t.actions.copyId}
             >
               <span className="truncate font-mono text-[11px]">{c.id}</span>
-              <Copy size={11} />
+              <Copy size={11} aria-hidden />
             </button>
           }
         />
         {c.open && (
-          <div className="flex items-center gap-1.5 pt-1 text-[12px]">
+          <div className="mt-2 flex items-center gap-1.5 text-[12px]">
             <StatusIcon status={claudeUi(c.open.status)} size={12} />
             {c.open.session
               ? t.info.openIn(c.open.session, t.status[claudeUi(c.open.status)] ?? c.open.status)
@@ -148,14 +161,14 @@ function ChatInfo({ chat }: { chat: Chat }) {
           </div>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {st.state === 'loading' && <Skeleton />}
         {st.state === 'error' && <ErrorLine message={st.message} retry={retry} />}
         {st.state === 'ok' &&
           st.data.tail.map((m, i) => (
-            <div key={i} className="mb-3">
+            <div key={i} className="mb-4">
               <div
-                className={`mb-0.5 text-[11px] font-semibold ${m.role === 'user' ? 'text-git' : 'text-accent'}`}
+                className={`mb-0.5 text-[12px] font-semibold ${m.role === 'user' ? 'text-muted' : 'text-accent-text'}`}
               >
                 {m.role === 'user' ? t.info.you : t.info.claude}
               </div>
@@ -167,7 +180,7 @@ function ChatInfo({ chat }: { chat: Chat }) {
             </div>
           ))}
       </div>
-      <div className="flex shrink-0 gap-2 border-t border-line p-3">
+      <div className="flex shrink-0 flex-wrap gap-2 border-t border-line px-4 py-3">
         {c.archived ? (
           <Button variant="primary" onClick={() => void A.restoreChat(c)}>
             {t.actions.restore}
@@ -175,16 +188,23 @@ function ChatInfo({ chat }: { chat: Chat }) {
         ) : (
           <>
             <Button variant="primary" onClick={() => void A.continueChat(c)}>
-              <MessageSquare size={14} />
+              <MessageSquare size={14} aria-hidden />
               {c.open ? t.actions.goTo : t.actions.continue}
             </Button>
             <Button onClick={() => void A.archiveChat(c)} disabled={!!c.open}>
-              <Archive size={14} />
+              <Archive size={14} aria-hidden />
               {t.actions.archive}
             </Button>
           </>
         )}
-        <DropdownMenu items={chatMenu(c)} trigger={<Button aria-label="Ещё">⋯</Button>} />
+        <DropdownMenu
+          items={chatMenu(c)}
+          trigger={
+            <Button variant="ghost" aria-label={t.actions.more} title={t.actions.more}>
+              <MoreHorizontal size={16} aria-hidden />
+            </Button>
+          }
+        />
       </div>
     </div>
   );
@@ -211,11 +231,11 @@ function ProjectInfo({ project }: { project: Project }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="space-y-1 border-b border-line p-3">
-          <div className="text-[14px] font-semibold">{project.name}</div>
-          <Field k={t.info.folder} v={shortPath(project.path, home)} />
+        <div className="border-b border-line p-4">
+          <div className="mb-2 text-[14px] font-semibold">{project.name}</div>
+          <Field k={t.info.folder} v={shortPath(project.path, home)} mono />
           {project.liveSession && (
-            <div className="flex items-center gap-1.5 text-[12px]">
+            <div className="mt-1 flex items-center gap-1.5 text-[12px]">
               <StatusIcon status={claudeUi(project.liveStatus)} size={12} />
               <button
                 className="hover:underline"
@@ -229,17 +249,19 @@ function ProjectInfo({ project }: { project: Project }) {
         {st.state === 'loading' && <Skeleton />}
         {st.state === 'error' && <ErrorLine message={st.message} retry={retry} />}
         {st.state === 'ok' && (
-          <div className="space-y-3 p-3 text-[12px]">
+          <div className="space-y-4 p-4 text-[12px]">
             {st.data.git ? (
               <div>
-                <div className="mb-1 flex items-center gap-2">
-                  <GitBranch size={13} className="text-git" />
-                  <span className="text-git">{st.data.git.branch}</span>
-                  {st.data.git.aheadBehind && <span className="text-muted">[{st.data.git.aheadBehind}]</span>}
+                <div className="mb-2 flex items-center gap-2">
+                  <GitBranch size={13} className="text-git" aria-hidden />
+                  <span className="mono text-git">{st.data.git.branch}</span>
+                  {st.data.git.aheadBehind && (
+                    <span className="mono text-muted">[{st.data.git.aheadBehind}]</span>
+                  )}
                 </div>
                 {st.data.git.changes.length > 0 && (
                   <div className="mb-2">
-                    <div className="section-title mb-0.5">{t.info.changes}</div>
+                    <div className="section-title mb-1">{t.info.changes}</div>
                     {st.data.git.changes.slice(0, 20).map((ch, i) => (
                       <div key={i} className="flex gap-2 font-mono text-[11px]">
                         <span className="w-5 shrink-0 text-dirty">{ch.status}</span>
@@ -248,54 +270,66 @@ function ProjectInfo({ project }: { project: Project }) {
                     ))}
                   </div>
                 )}
-                <div className="section-title mb-0.5">{t.info.commits}</div>
+                <div className="section-title mb-1">{t.info.commits}</div>
                 {st.data.git.log.map((l) => (
                   <div key={l.hash} className="flex gap-2">
                     <span className="shrink-0 font-mono text-[11px] text-dirty">{l.hash}</span>
                     <span className="min-w-0 flex-1 truncate">{l.subject}</span>
-                    <span className="shrink-0 text-faint">{formatAgo(l.at)}</span>
+                    <span className="tnum shrink-0 text-faint">{formatAgo(l.at)}</span>
                   </div>
                 ))}
               </div>
             ) : (
               !project.isHome && <div className="text-muted">{t.info.noGit}</div>
             )}
-            {st.data.hasClaudeMd && <div className="text-st-idle">{t.info.claudeMd}</div>}
+            {st.data.hasClaudeMd && (
+              <div className="flex items-center gap-1.5 text-fg">
+                <FileCheck size={13} className="text-st-idle" aria-hidden />
+                <span className="mono">{t.info.claudeMd}</span>
+              </div>
+            )}
             {pc.length > 0 && (
               <div>
-                <div className="section-title mb-0.5">{t.info.projectChats}</div>
+                <div className="section-title mb-1">{t.info.projectChats}</div>
                 {pc.map((c) => (
                   <button
                     key={c.id}
-                    className="flex w-full gap-2 rounded px-1 py-0.5 text-left hover:bg-hover"
+                    className="-mx-1 flex w-[calc(100%+8px)] gap-2 rounded-[4px] px-1 py-0.5 text-left hover:bg-hover"
                     onDoubleClick={() => void A.continueChat(c)}
                     onClick={() => useUi.getState().setSelection({ kind: 'chat', id: c.id })}
                   >
                     <span className="min-w-0 flex-1 truncate">{c.title}</span>
-                    <span className="shrink-0 text-faint">{formatAgo(c.lastAt)}</span>
+                    <span className="tnum shrink-0 text-faint">{formatAgo(c.lastAt)}</span>
                   </button>
                 ))}
               </div>
             )}
-            <div className="break-words text-faint">{st.data.entries.join('  ')}</div>
+            {st.data.entries.length > 0 && (
+              <div>
+                <div className="section-title mb-1">{t.info.entries}</div>
+                <div className="mono break-words text-[11px] leading-5 text-muted">
+                  {st.data.entries.join('  ')}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
-      <div className="flex shrink-0 flex-wrap gap-2 border-t border-line p-3">
+      <div className="flex shrink-0 flex-wrap gap-2 border-t border-line px-4 py-3">
         <Button variant="primary" onClick={() => void A.newChat(project.path)}>
-          <Plus size={14} />
+          <Plus size={14} aria-hidden />
           {t.actions.newChat}
         </Button>
         <Button onClick={() => A.openTemp('shell', project.path)}>
-          <SquareTerminal size={14} />
-          Shell
+          <SquareTerminal size={14} aria-hidden />
+          {t.actions.shell}
         </Button>
         <Button onClick={() => A.openTemp('lazygit', project.path)} disabled={!project.git}>
-          <GitBranch size={14} />
-          lazygit
+          <GitBranch size={14} aria-hidden />
+          {t.actions.lazygit}
         </Button>
         <Button onClick={() => A.openVsCode(project.path)}>
-          <Code size={14} />
+          <Code size={14} aria-hidden />
           VS Code
         </Button>
       </div>
@@ -353,7 +387,7 @@ function SessionInfo({ name }: { name: string }) {
   const last = useRef<SessionDetails | null>(null);
   if (st.state === 'ok') last.current = st.data;
   const details = st.state === 'ok' ? st.data : !online ? last.current : null;
-  if (!s) return <div className="p-3 text-[12px] text-muted">{t.term.ended(name)}</div>;
+  if (!s) return <div className="p-4 text-[12px] text-muted">{t.term.ended(name)}</div>;
   const ss = sessionStatus(s);
   const info = primary ? details?.claude.find((c) => c.chatId === primary.chatId) : undefined;
   const chat = liveChat ?? info?.chat ?? null;
@@ -364,8 +398,8 @@ function SessionInfo({ name }: { name: string }) {
     .join('\n');
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className={`min-h-0 flex-1 overflow-y-auto ${!online ? 'opacity-60' : ''}`} data-session-info>
-        <div className="space-y-1 border-b border-line p-3">
+      <div className={`min-h-0 flex-1 overflow-y-auto`} data-session-info>
+        <div className="space-y-1 border-b border-line p-4">
           <div className="flex items-center gap-2 text-[12px] text-muted">
             <StatusIcon status={ss.ui} size={12} />
             <span className="font-semibold text-fg">{s.name}</span>
@@ -374,21 +408,22 @@ function SessionInfo({ name }: { name: string }) {
             <>
               {chat ? (
                 <button
-                  className="group block w-full text-left text-[14px] font-semibold leading-snug hover:text-accent"
+                  className="group block w-full text-left text-[15px] font-semibold leading-snug hover:text-accent-text"
                   title={t.info.inChatList}
                   onClick={() => A.showChatInList(chat.id)}
                 >
                   {chat.title}
                   <ExternalLink
                     size={12}
-                    className="ml-1 inline align-baseline text-faint group-hover:text-accent"
+                    aria-hidden
+                    className="ml-1 inline align-baseline text-faint group-hover:text-accent-text"
                   />
                 </button>
               ) : (
                 <div className="text-[14px] font-semibold text-muted">{t.info.newChat}</div>
               )}
               <div
-                className={`text-[12px] ${STATUS_COLOR[primary.status] ?? 'text-muted'}`}
+                className={`text-[13px] font-medium ${STATUS_COLOR[primary.status] ?? 'text-muted'}`}
                 title={primary.statusAt ? formatWhen(primary.statusAt) : undefined}
               >
                 {statusLine(primary.status, primary.statusAt, now)}
@@ -402,15 +437,15 @@ function SessionInfo({ name }: { name: string }) {
           )}
         </div>
         {primary && (
-          <div className="border-b border-line p-3">
+          <div className="border-b border-line p-4">
             {details ? (
               info?.lastPrompt ? (
                 <>
-                  <div className="section-title mb-0.5">
+                  <div className="section-title mb-1">
                     {t.info.lastPrompt}
                     {info.lastPrompt.at && (
                       <span
-                        className="ml-1 font-normal normal-case tracking-normal text-faint"
+                        className="tnum ml-1 font-normal text-faint"
                         title={formatWhen(info.lastPrompt.at)}
                       >
                         · {formatClock(info.lastPrompt.at, now)}
@@ -436,17 +471,21 @@ function SessionInfo({ name }: { name: string }) {
             )}
           </div>
         )}
-        <div className="space-y-1 p-3">
-          {!online && details && <div className="pb-1 text-[11px] text-faint">{t.info.staleOffline}</div>}
-          <Field k={t.info.folder} v={shortPath(s.path, home)} />
+        <div className="p-4">
+          {!online && details && <div className="pb-2 text-[12px] text-faint">{t.info.staleOffline}</div>}
+          <Field k={t.info.folder} v={shortPath(s.path, home)} mono />
           {git && (
             <Field
               k={t.info.branch}
               v={
                 <>
-                  <span className="text-git">{git.branch}</span>
-                  {git.dirty && <span className="ml-1 text-dirty">✱</span>}
-                  {git.aheadBehind && <span className="ml-1 text-muted">[{git.aheadBehind}]</span>}
+                  <span className="mono text-git">{git.branch}</span>
+                  {git.dirty && (
+                    <span className="ml-1 text-dirty" title={t.sidebar.dirty}>
+                      ✱
+                    </span>
+                  )}
+                  {git.aheadBehind && <span className="mono ml-1 text-muted">[{git.aheadBehind}]</span>}
                 </>
               }
             />
@@ -488,15 +527,21 @@ function SessionInfo({ name }: { name: string }) {
           {!primary && st.state === 'error' && <ErrorLine message={st.message} retry={retry} />}
         </div>
       </div>
-      <div className="flex shrink-0 flex-wrap gap-2 border-t border-line p-3">
+      <div className="flex shrink-0 flex-wrap gap-2 border-t border-line px-4 py-3">
         <Button variant="primary" small onClick={() => A.openSession(s.name)}>
-          <SquareTerminal size={14} />
+          <SquareTerminal size={14} aria-hidden />
           {t.actions.goTo}
         </Button>
-        <Button small onClick={() => A.renameSession(s.name)}>
-          {t.actions.rename}
+        <Button
+          small
+          onClick={() => A.renameSession(s.name)}
+          aria-label={t.actions.rename}
+          title={t.actions.rename}
+        >
+          <Pencil size={13} aria-hidden />
         </Button>
-        <Button variant="danger" small onClick={() => A.killSession(s.name)}>
+        <Button variant="danger-soft" small onClick={() => A.killSession(s.name)}>
+          <Trash2 size={14} aria-hidden />
           {t.actions.killSession}
         </Button>
       </div>
@@ -519,7 +564,9 @@ export function RightPanel() {
   const chats = useData((d) => d.chats);
   const projects = useData((d) => d.projects);
   const ctx = currentContext(selection);
-  let body: React.ReactNode = <div className="p-4 text-[12px] text-muted">{t.info.nothing}</div>;
+  let body: React.ReactNode = (
+    <div className="p-4 text-[12px] leading-relaxed text-muted">{t.info.nothing}</div>
+  );
   if (ctx?.kind === 'chat' && chats[ctx.id]) body = <ChatInfo chat={chats[ctx.id] as Chat} key={ctx.id} />;
   else if (ctx?.kind === 'project') {
     const p = projects.find((x) => x.path === ctx.path);
@@ -534,16 +581,23 @@ export function RightPanel() {
   ];
   return (
     <aside className="flex h-full min-h-0 flex-col bg-surface" data-right-panel>
-      <div className="flex h-8 shrink-0 items-end gap-1 border-b border-line px-2">
+      <div className="flex h-9 shrink-0 items-end gap-1 border-b border-line px-2" role="tablist">
         {tabs.map((x) => (
           <button
             key={x.id}
+            role="tab"
+            aria-selected={rightTab === x.id}
             disabled={x.disabled}
             title={x.disabled ? t.info.soon : undefined}
-            className={`h-7 rounded-t px-2 text-[12px] disabled:opacity-40 ${rightTab === x.id ? 'border-b-2 border-accent text-fg' : 'text-muted hover:text-fg'}`}
+            className={`relative flex h-8 items-center gap-1 rounded-t-[6px] px-2.5 text-[12px] transition-colors duration-100 disabled:text-faint ${rightTab === x.id ? 'font-semibold text-fg' : 'text-muted enabled:hover:bg-hover enabled:hover:text-fg'}`}
             onClick={() => useUi.getState().setLayout({ rightTab: x.id })}
           >
             {x.label}
+            {/* TODO stage 5: Files and Git; the label is visible, not only a tooltip (R-26) */}
+            {x.disabled && <span className="text-[11px] font-normal text-faint">{t.info.soonLabel}</span>}
+            {rightTab === x.id && (
+              <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-t bg-accent" />
+            )}
           </button>
         ))}
       </div>

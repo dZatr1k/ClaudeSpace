@@ -26,7 +26,7 @@ describe('formatClock', () => {
     expect(formatClock(new Date(2026, 10, 8, 9, 7).getTime(), now)).toBe('09:07');
     expect(formatClock(new Date(2026, 10, 7, 23, 59).getTime(), now)).toBe('вчера 23:59');
     expect(formatClock(new Date(2026, 10, 1, 8, 0).getTime(), now)).toBe('01.11 08:00');
-    expect(formatClock(null, now)).toBe('—');
+    expect(formatClock(null, now)).toBe('нет');
   });
 });
 

@@ -127,7 +127,7 @@ export async function continueChat(chat: Chat): Promise<void> {
   }
   if (!requireOnline()) return;
   if (!chat.project) {
-    toast('Папка чата не найдена', 'error');
+    toast(t.toasts.chatFolderMissing, 'error');
     return;
   }
   try {

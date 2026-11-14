@@ -127,7 +127,7 @@ describe('misc main helpers', () => {
     });
     await expect(launchRdp('C:\\missing\\rdp.ps1', { platform: 'win32' })).resolves.toEqual({
       ok: false,
-      error: 'Не найден C:\\missing\\rdp.ps1 — путь в Настройках → Интеграции',
+      error: 'Файл C:\\missing\\rdp.ps1 не найден. Проверьте путь в Настройки → Интеграции',
     });
   });
   it('RDP outside Windows is a clear error', async () => {

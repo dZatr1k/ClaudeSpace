@@ -11,14 +11,14 @@ import type { MenuEntry } from '../ui/Menu';
 function mountMark(m: PcMountState): string {
   if (m.busy) return '…';
   if (m.error && !m.mounted) return '✕';
-  return m.mounted ? '✓' : '—';
+  return m.mounted ? '✓' : '○';
 }
 
 export function pcLinkText(s: PcLinkState): string {
   const parts = [t.pclink[`tunnel_${s.tunnel}`]];
   if (s.sshd === 'down' && (s.tunnel === 'ours' || s.tunnel === 'foreign')) parts.push(t.pclink.sshdDown);
-  for (const m of s.mounts) parts.push(`диск ${m.label} ${mountMark(m)}`);
-  return `ПК: ${parts.join(' · ')}`;
+  for (const m of s.mounts) parts.push(t.pclink.disk(m.label, mountMark(m)));
+  return t.pclink.prefix(parts.join(' · '));
 }
 
 function tone(s: PcLinkState): string {
@@ -36,7 +36,7 @@ function tip(s: PcLinkState): string {
   if (s.conns) lines.push(t.pclink.conns(s.conns));
   for (const m of s.mounts) {
     lines.push(
-      `${m.src} → ${m.dst}${m.mounted && !m.owned ? ' (вручную)' : ''}${m.error ? `: ${m.error}` : ''}`,
+      `${m.src} → ${m.dst}${m.mounted && !m.owned ? ` (${t.pclink.manual})` : ''}${m.error ? `: ${m.error}` : ''}`,
     );
   }
   return lines.join('\n');
@@ -85,7 +85,7 @@ export function PcLinkIndicator({ className }: { className: string }) {
       items={items}
       trigger={
         <button className={`${className} ${tone(s)}`} title={tip(s)} data-testid="status-pclink">
-          <Monitor size={13} />
+          <Monitor size={13} aria-hidden />
           {pcLinkText(s)}
         </button>
       }

@@ -14,8 +14,9 @@ export interface MenuItem {
 export type MenuEntry = MenuItem | 'sep';
 
 const itemCls =
-  'flex h-7 cursor-default select-none items-center gap-2 rounded px-2 text-[13px] outline-none data-[highlighted]:bg-hover data-[disabled]:opacity-40';
-const contentCls = 'z-50 min-w-[200px] rounded-[8px] border border-line-strong bg-elevated p-1 shadow-float';
+  'flex h-7 select-none items-center gap-2 rounded-[4px] px-2 text-[13px] outline-none data-[highlighted]:bg-selected data-[highlighted]:shadow-[inset_0_0_0_1px_var(--border-control)] data-[disabled]:opacity-45';
+const contentCls =
+  'anim-drop z-50 min-w-[200px] rounded-[10px] border border-line-strong bg-elevated p-1 shadow-pop';
 
 function Items({
   items,
@@ -38,9 +39,11 @@ function Items({
             disabled={it.disabled}
             onSelect={() => it.run()}
           >
-            <span className="w-4 shrink-0 text-muted">{it.icon}</span>
+            <span className={`flex w-4 shrink-0 justify-center ${it.danger ? '' : 'text-muted'}`} aria-hidden>
+              {it.icon}
+            </span>
             <span className="flex-1">{it.label}</span>
-            {it.hint && <span className="text-[11px] text-faint">{it.hint}</span>}
+            {it.hint && <span className="mono pl-4 text-[11px] text-faint">{it.hint}</span>}
           </Item>
         ),
       )}

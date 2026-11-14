@@ -6,7 +6,9 @@ import {
   MessageCircleQuestion,
   SquareTerminal,
 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { UiStatus } from '@shared/model';
+import { t } from '../../i18n/ru';
 
 const COLOR: Record<UiStatus, string> = {
   busy: 'text-st-busy',
@@ -17,7 +19,10 @@ const COLOR: Record<UiStatus, string> = {
   offline: 'text-st-offline',
 };
 
-/** Status is always shape + colour (readable without colour). */
+/**
+ * Status is always shape + colour (readable without colour). When the status changes (not on first render, so a
+ * scrolled list does not flicker) the icon plays a short «pop» (DESIGN §5.6): the eye lands on the row that changed.
+ */
 export function StatusIcon({
   status,
   size = 14,
@@ -27,20 +32,46 @@ export function StatusIcon({
   size?: number;
   unknown?: boolean;
 }) {
+  const prev = useRef(status);
+  const [pop, setPop] = useState(0);
+  useEffect(() => {
+    if (prev.current === status) return;
+    prev.current = status;
+    setPop((n) => n + 1);
+  }, [status]);
   const cls = `${unknown ? 'text-st-none' : COLOR[status]} shrink-0`;
-  const p = { size, strokeWidth: 1.75, className: cls, 'aria-label': status };
+  const label = t.status[status] || (status === 'none' ? 'не Claude' : status);
+  const p = { size, strokeWidth: 1.9, className: cls, 'aria-hidden': true as const };
+  let icon;
   switch (status) {
     case 'busy':
-      return <LoaderCircle {...p} className={`${cls} anim-spin`} />;
+      icon = <LoaderCircle {...p} className={`${cls} anim-spin`} />;
+      break;
     case 'waiting':
-      return <MessageCircleQuestion {...p} className={`${cls} anim-pulse`} />;
+      icon = <MessageCircleQuestion {...p} className={`${cls} anim-pulse`} />;
+      break;
     case 'idle':
-      return <Circle {...p} fill="currentColor" size={size - 4} />;
+      icon = <Circle {...p} fill="currentColor" size={size - 5} />;
+      break;
     case 'none':
-      return <SquareTerminal {...p} />;
+      icon = <SquareTerminal {...p} />;
+      break;
     case 'error':
-      return <CircleAlert {...p} />;
+      icon = <CircleAlert {...p} />;
+      break;
     case 'offline':
-      return <CircleDashed {...p} />;
+      icon = <CircleDashed {...p} />;
+      break;
   }
+  return (
+    <span
+      key={pop}
+      role="img"
+      aria-label={label}
+      className={`${pop ? 'anim-pop' : ''} inline-flex shrink-0 items-center justify-center`}
+      style={{ width: size, height: size }}
+    >
+      {icon}
+    </span>
+  );
 }

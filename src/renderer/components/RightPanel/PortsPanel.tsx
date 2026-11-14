@@ -1,6 +1,6 @@
 // «Порты» (BACKLOG 10): ports the user's processes listen on at the VM; open in the PC browser, forward/close,
 // copy the URL, pin (re-forwarded on every connect).
-import { Copy, ExternalLink, Pin, PinOff, Plug, Unplug } from 'lucide-react';
+import { Copy, ExternalLink, Pin, PinOff, Plug, Unplug, WifiOff } from 'lucide-react';
 import type { VmPort } from '@shared/protocol';
 import type { ForwardInfo } from '@shared/ports';
 import { invoke } from '../../bridge';
@@ -50,29 +50,29 @@ function Row({
   ].filter(Boolean);
   return (
     <div
-      className={`group flex items-center gap-2 px-3 py-1 hover:bg-hover ${vm ? '' : 'opacity-60'}`}
+      className={`group flex items-center gap-1 px-4 py-1.5 hover:bg-hover ${vm ? '' : 'opacity-70'}`}
       data-port={port}
       title={vm?.cwd ?? undefined}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2 text-[13px]">
-          <span className="tnum font-mono">:{port}</span>
+          <span className="tnum font-mono font-semibold">:{port}</span>
           <span className="truncate text-muted">{[vm?.name, vm?.project].filter(Boolean).join(' · ')}</span>
         </div>
         {sub.length > 0 && (
           <div
-            className={`truncate text-[11px] ${fwd && fwd.localPort !== port ? 'text-st-waiting' : 'text-faint'}`}
+            className={`truncate text-[12px] ${fwd && fwd.localPort !== port ? 'text-st-waiting' : 'text-faint'}`}
           >
             {sub.join(' · ')}
           </div>
         )}
       </div>
       <IconButton title={t.ports.open} disabled={!online} onClick={() => void openVmPort(port)}>
-        <ExternalLink size={14} />
+        <ExternalLink size={14} aria-hidden />
       </IconButton>
       {fwd && !fwd.direct ? (
         <IconButton title={t.ports.close} onClick={() => void invoke('ports.close', { vmPort: port })}>
-          <Unplug size={14} />
+          <Unplug size={14} aria-hidden />
         </IconButton>
       ) : (
         <IconButton
@@ -80,18 +80,18 @@ function Row({
           disabled={!online || !!fwd?.direct}
           onClick={() => void forwardVmPort(port)}
         >
-          <Plug size={14} />
+          <Plug size={14} aria-hidden />
         </IconButton>
       )}
       <IconButton title={t.ports.copy} disabled={!online} onClick={() => void copyUrl(port)}>
-        <Copy size={14} />
+        <Copy size={14} aria-hidden />
       </IconButton>
       <IconButton
         title={pinned ? t.ports.unpin : t.ports.pin}
         active={pinned}
         onClick={() => void setPinned(port, !pinned)}
       >
-        {pinned ? <PinOff size={14} /> : <Pin size={14} />}
+        {pinned ? <PinOff size={14} aria-hidden /> : <Pin size={14} aria-hidden />}
       </IconButton>
     </div>
   );
@@ -109,10 +109,19 @@ export function PortsPanel() {
   ];
   all.sort((a, b) => a - b);
   return (
-    <div className="min-h-0 flex-1 overflow-auto py-2" data-ports-panel>
-      <div className="px-3 pb-2 text-[11px] text-faint">{t.ports.hint}</div>
-      {!online && <div className="px-3 pb-2 text-[12px] text-muted">{t.ports.offline}</div>}
-      {online && all.length === 0 && <div className="px-3 text-[12px] text-muted">{t.ports.empty}</div>}
+    <div className="min-h-0 flex-1 overflow-auto py-3" data-ports-panel>
+      <div className="px-4 pb-3 text-[12px] leading-relaxed text-faint">{t.ports.hint}</div>
+      {!online && (
+        <div className="mx-4 mb-2 flex items-start gap-2 text-[12px] text-muted" role="status">
+          <WifiOff size={13} className="mt-0.5 shrink-0 text-st-error" aria-hidden />
+          {t.ports.offline}
+        </div>
+      )}
+      {online && all.length === 0 && (
+        <div className="mx-4 rounded-[6px] border border-dashed border-line-strong p-3 text-[12px] leading-relaxed text-muted">
+          {t.ports.empty}
+        </div>
+      )}
       {all.map((p) => (
         <Row
           key={p}

@@ -14,6 +14,7 @@ import { useData } from '../../stores/data';
 import { useUi } from '../../stores/ui';
 import { chatMenu, projectMenu, sessionMenu } from '../menus';
 import type { MenuEntry, MenuItem } from '../ui/Menu';
+import { Kbd } from '../ui/Button';
 import { StatusIcon } from '../ui/StatusIcon';
 
 interface Entry {
@@ -52,8 +53,8 @@ function searchEntry(query: string): Entry {
     key: 'fts',
     group: 'search',
     title: t.palette.searchText(query),
-    hint: '⏎',
-    icon: <Search size={13} className="text-faint" />,
+    hint: 'Enter',
+    icon: <Search size={13} className="text-faint" aria-hidden />,
     needsVm: true,
     run: () => useUi.getState().set({ chatSearch: query }),
     score: 1,
@@ -67,7 +68,7 @@ function sessionEntry(s: Session, q: string): Entry {
     group: 'sessions',
     title: s.name,
     meta: s.claude.length ? t.status[st.ui] : s.command,
-    hint: '⏎ перейти',
+    hint: t.palette.goTo,
     icon: <StatusIcon status={st.ui} size={13} />,
     run: () => A.openSession(s.name),
     secondary: () => sessionMenu(s),
@@ -81,7 +82,7 @@ function chatEntry(c: Chat, pname: string, q: string): Entry {
     group: 'chats',
     title: c.title,
     meta: `${pname} · ${formatAgo(c.lastAt)}`,
-    hint: c.open ? '⏎ перейти' : '⏎ продолжить',
+    hint: c.open ? t.palette.goTo : t.palette.continue,
     icon: c.open ? <StatusIcon status={claudeUi(c.open.status)} size={13} /> : <span className="w-[13px]" />,
     needsVm: true,
     run: () => void A.continueChat(c),
@@ -100,7 +101,7 @@ function projectEntry(p: Project, q: string): Entry {
     group: 'projects',
     title: p.name,
     meta: p.git ? `${p.git.branch}${p.git.dirty ? ' ✱' : ''}` : undefined,
-    hint: p.liveSession ? '⏎ перейти' : '⏎ новый чат',
+    hint: p.liveSession ? t.palette.goTo : t.palette.newChat,
     icon: p.liveSession ? (
       <StatusIcon status={claudeUi(p.liveStatus)} size={13} />
     ) : (
@@ -196,9 +197,9 @@ export function Palette() {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && close()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/30" />
+        <Dialog.Overlay className="anim-fade fixed inset-0 z-40 bg-[var(--scrim)]" />
         <Dialog.Content
-          className="fixed left-1/2 top-[15%] z-50 w-[640px] max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-[8px] border border-line-strong bg-elevated shadow-float"
+          className="anim-rise fixed left-1/2 top-[14%] z-50 w-[660px] max-w-[calc(100vw-32px)] -translate-x-1/2 overflow-hidden rounded-[10px] border border-line-strong bg-elevated shadow-modal"
           aria-describedby={undefined}
         >
           <Dialog.Title className="sr-only">{t.actions.palette}</Dialog.Title>
@@ -222,22 +223,25 @@ export function Palette() {
               }
             }}
           >
-            <div className="flex items-center gap-2 border-b border-line px-3">
-              <Search size={15} className="text-faint" />
+            <div className="flex items-center gap-3 border-b border-line px-4 focus-within:border-accent">
+              <span className="diamond text-[13px]" aria-hidden />
               <Cmdk.Input
                 value={q}
                 onValueChange={setQ}
                 placeholder={secondary ? t.palette.secondary(secondary.title) : t.palette.placeholder}
-                className="h-11 flex-1 bg-transparent text-[14px] outline-none placeholder:text-faint"
+                aria-label={t.actions.palette}
+                className="h-12 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
                 autoFocus
               />
             </div>
-            <Cmdk.List className="max-h-[60vh] overflow-y-auto p-1">
-              <Cmdk.Empty className="px-3 py-6 text-center text-[12px] text-muted">
+            <Cmdk.List className="max-h-[60vh] overflow-y-auto p-1.5">
+              <Cmdk.Empty className="px-3 py-8 text-center text-[13px] text-muted">
                 {t.palette.empty}
               </Cmdk.Empty>
               {secondary ? (
-                <Cmdk.Group heading={<span className="section-title px-2">{secondary.title}</span>}>
+                <Cmdk.Group
+                  heading={<span className="section-title block px-2 pb-1 pt-2">{secondary.title}</span>}
+                >
                   {secondary.items.map((it, i) => (
                     <Cmdk.Item
                       key={i}
@@ -247,16 +251,21 @@ export function Palette() {
                         close();
                         it.run();
                       }}
-                      className="flex h-8 cursor-default items-center gap-2 rounded px-2 text-[13px] data-[selected=true]:bg-selected data-[disabled=true]:opacity-40"
+                      className="flex h-9 items-center gap-2.5 rounded-[6px] px-2.5 text-[13px] data-[selected=true]:bg-selected data-[selected=true]:shadow-[inset_0_0_0_1px_var(--border-control)] data-[disabled=true]:opacity-45"
                     >
-                      <span className="w-4 text-muted">{it.icon}</span>
+                      <span className="flex w-4 justify-center text-muted" aria-hidden>
+                        {it.icon}
+                      </span>
                       <span className={it.danger ? 'text-st-error' : ''}>{it.label}</span>
                     </Cmdk.Item>
                   ))}
                 </Cmdk.Group>
               ) : (
                 grouped.map((g) => (
-                  <Cmdk.Group key={g.id} heading={<span className="section-title px-2">{g.label}</span>}>
+                  <Cmdk.Group
+                    key={g.id}
+                    heading={<span className="section-title block px-2 pb-1 pt-2">{g.label}</span>}
+                  >
                     {g.items.map((e) => {
                       const off = e.needsVm && !online;
                       return (
@@ -264,16 +273,23 @@ export function Palette() {
                           key={e.key}
                           value={e.key}
                           onSelect={() => run(e)}
-                          className={`flex h-8 cursor-default items-center gap-2 rounded px-2 text-[13px] data-[selected=true]:bg-selected ${off ? 'opacity-40' : ''}`}
+                          className={`group/item relative flex h-9 items-center gap-2.5 rounded-[6px] px-2.5 text-[13px] data-[selected=true]:bg-selected data-[selected=true]:shadow-[inset_0_0_0_1px_var(--border-control)] ${off ? 'text-faint' : ''}`}
                         >
-                          {e.icon}
+                          <span className="flex w-[14px] shrink-0 justify-center">{e.icon}</span>
                           <span className="min-w-0 flex-1 truncate">{e.title}</span>
                           {e.meta && (
                             <span className="shrink-0 truncate text-[12px] text-muted">{e.meta}</span>
                           )}
-                          <span className="shrink-0 text-[11px] text-faint">
-                            {off ? t.palette.offline : e.hint}
-                          </span>
+                          {off ? (
+                            <span className="shrink-0 text-[12px] text-faint">{t.palette.offline}</span>
+                          ) : e.group === 'actions' && e.hint ? (
+                            <Kbd>{e.hint}</Kbd>
+                          ) : e.hint ? (
+                            <span className="hidden shrink-0 items-center gap-1 text-[12px] text-muted group-data-[selected=true]/item:flex">
+                              <Kbd>Enter</Kbd>
+                              {e.hint !== 'Enter' && e.hint}
+                            </span>
+                          ) : null}
                         </Cmdk.Item>
                       );
                     })}
@@ -281,7 +297,20 @@ export function Palette() {
                 ))
               )}
             </Cmdk.List>
-            <div className="border-t border-line px-3 py-1.5 text-[11px] text-faint">{t.palette.hint}</div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line bg-surface/60 px-4 py-2 text-[12px] text-faint">
+              <span className="flex items-center gap-1.5">
+                <Kbd>↑↓</Kbd> {t.palette.hintSelect}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Kbd>Enter</Kbd> {t.palette.hintRun}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Kbd>Tab</Kbd> {t.palette.hintMore}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Kbd>Esc</Kbd> {t.palette.hintClose}
+              </span>
+            </div>
           </Cmdk>
         </Dialog.Content>
       </Dialog.Portal>

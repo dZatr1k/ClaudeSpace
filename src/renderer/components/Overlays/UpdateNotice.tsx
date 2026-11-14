@@ -22,13 +22,15 @@ export function UpdateNotice() {
     <div
       role="status"
       data-update-notice
-      className="fixed bottom-8 left-4 z-[60] flex max-w-[420px] items-start gap-2 rounded-[8px] border border-line-strong bg-elevated px-3 py-2 text-[13px] shadow-float"
+      className="anim-slide-l fixed bottom-8 left-4 z-[60] flex max-w-[400px] items-start gap-3 rounded-[10px] border border-line-strong bg-elevated p-3.5 text-[13px] shadow-pop"
     >
-      <Download size={16} className="mt-0.5 shrink-0 text-accent" />
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-accent text-accent-fg">
+        <Download size={16} aria-hidden />
+      </span>
       <div className="min-w-0 flex-1">
-        <div>{t.update.ready(st.version)}</div>
-        <div className="mt-0.5 text-[12px] text-faint">{t.update.laterHint}</div>
-        <div className="mt-2 flex gap-2">
+        <div className="font-semibold">{t.update.ready(st.version)}</div>
+        <div className="mt-0.5 text-[12px] leading-snug text-muted">{t.update.laterHint}</div>
+        <div className="mt-3 flex gap-2">
           <Button
             small
             variant="primary"

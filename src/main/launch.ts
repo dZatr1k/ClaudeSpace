@@ -28,10 +28,13 @@ export function launchRdp(script: string, o: RdpOptions = {}): Promise<LaunchRes
     return Promise.resolve({
       ok: false,
       notConfigured: true,
-      error: 'Скрипт RDP не задан — укажите путь в Настройках → Интеграции',
+      error: 'Скрипт RDP не задан. Укажите путь в Настройки → Интеграции',
     });
   if (!existsSync(script))
-    return Promise.resolve({ ok: false, error: `Не найден ${script} — путь в Настройках → Интеграции` });
+    return Promise.resolve({
+      ok: false,
+      error: `Файл ${script} не найден. Проверьте путь в Настройки → Интеграции`,
+    });
   const args = ['-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', script];
   return new Promise((resolve) => {
     let done = false;
@@ -112,7 +115,7 @@ export function launchVsCode(
   const uri = vscodeFolderUri(host, path);
   if (!SAFE_URI.test(uri)) return { ok: false, error: 'Недопустимый путь для VS Code' };
   const exe = findVsCode(command || 'code', platform);
-  if (!exe) return { ok: false, error: 'VS Code не найден — команда в Настройках → Интеграции' };
+  if (!exe) return { ok: false, error: 'VS Code не найден. Проверьте команду в Настройки → Интеграции' };
   try {
     if (platform === 'win32' && /\.cmd$/i.test(exe)) {
       // .cmd needs cmd.exe; the URI is validated above (no spaces, quotes or shell metacharacters except %)
