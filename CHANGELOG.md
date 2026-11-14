@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
 - Several chats on screen: the layout button in the title bar shows one tab, two side by side, two stacked or
   four. Clicking a tab puts it into the focused pane; Ctrl+Alt+← / → moves between panes. The layout is restored
   on the next start.
