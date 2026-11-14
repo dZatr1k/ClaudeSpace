@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0
+- Images in chats: paste a screenshot with Ctrl+V or drop image files onto a terminal. The image is uploaded
+  to the VM (`~/.cache/claudespace/images`, kept for a week) and its path is pasted, so Claude Code attaches it.
+- The empty space after the tabs moves the window.
+
 ## 0.4.0
 - Startup splash: the app shows the connection stages (settings, login, agent) while it connects to the VM
   instead of an empty window saying "no connection"; retry or open offline if the VM does not answer.
