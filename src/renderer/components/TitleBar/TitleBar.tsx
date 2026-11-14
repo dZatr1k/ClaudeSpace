@@ -261,7 +261,8 @@ export function TitleBar() {
       <div
         ref={stripRef}
         role="tablist"
-        className="no-drag ml-1 flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto overflow-y-hidden"
+        // empty space after the tabs moves the window; tabs and buttons are no-drag themselves
+        className="drag ml-1 flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto overflow-y-hidden"
         style={{ scrollbarWidth: 'none' }}
         onWheel={(e) => {
           if (stripRef.current) stripRef.current.scrollLeft += e.deltaY;
@@ -276,7 +277,7 @@ export function TitleBar() {
             status={tabStatus(tab, st, online)}
           />
         ))}
-        <div className="flex h-[30px] shrink-0 items-center">
+        <div className="no-drag flex h-[30px] shrink-0 items-center">
           <IconButton
             title={`${t.actions.newChat} (Ctrl+Shift+N)`}
             onClick={() => A.newChatHere()}
