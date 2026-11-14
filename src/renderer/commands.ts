@@ -1,5 +1,7 @@
 // One registry of app actions: the palette, menus and hotkeys take them from here.
 import { defaultSettings } from '@shared/settings';
+import { CLAUDE_MODELS } from '@shared/protocol';
+import { activeClaude, canCommand, canInterrupt, claudeAction, setModel } from './lib/claude';
 import { pasteClipboardImage } from './lib/images';
 import { invoke } from './bridge';
 import { t } from './i18n/ru';
@@ -200,6 +202,32 @@ export function runAppCommand(id: AppCommandId): void {
   }
 }
 
+/** Claude of the active tab: only the actions that make sense in its state (lib/claude.ts) */
+function claudeCommands(): Command[] {
+  const c = activeClaude();
+  if (!c) return [];
+  const p = t.claudeBar.palette;
+  const list: Command[] = [];
+  if (canInterrupt(c))
+    list.push({
+      id: 'claude.interrupt',
+      title: p(t.claudeBar.interrupt),
+      run: () => claudeAction('interrupt', c),
+    });
+  if (canCommand(c)) {
+    list.push(
+      { id: 'claude.compact', title: p(t.claudeBar.compact), run: () => claudeAction('compact', c) },
+      { id: 'claude.clear', title: p(t.claudeBar.clear), run: () => claudeAction('clear', c) },
+      ...CLAUDE_MODELS.map((m) => ({
+        id: `claude.model.${m}`,
+        title: p(`${t.claudeBar.model.toLowerCase()} ${t.claudeBar.models[m] ?? m}`),
+        run: () => setModel(m, c),
+      })),
+    );
+  }
+  return list;
+}
+
 /** Global actions for the palette (context-dependent titles). */
 export function getCommands(): Command[] {
   const cwd = A.activeCwd();
@@ -240,6 +268,7 @@ export function getCommands(): Command[] {
           { id: 'vscode.here', title: `${t.actions.vscode}: «${here}»`, run: () => cwd && A.openVsCode(cwd) },
         ]
       : []),
+    ...claudeCommands(),
     {
       id: 'shell.home',
       title: t.actions.shellHome,

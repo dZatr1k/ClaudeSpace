@@ -37,8 +37,10 @@ WINDOW_RE = re.compile(r'^[0-9]{1,4}$')
 SEARCH_ID_RE = re.compile(r'^[A-Za-z0-9_-]{1,32}$')
 SLOW = {'usage', 'doctor', 'system', 'project_preview', 'session_preview', 'mosh_list', 'mosh_kill_stale',
         'create_project', 'winfs_mount', 'winfs_unmount', 'pc_tunnel_status', 'askpass_enable',
-        'fs_list', 'fs_read', 'git_status', 'git_diff', 'git_log'}
+        'fs_list', 'fs_read', 'git_status', 'git_diff', 'git_log', 'claude_send'}
 TUNNEL_PORT = 2222
+CLAUDE_ACTION_RE = re.compile(r'^(interrupt|compact|clear|model)$')
+CLAUDE_MODEL_RE = re.compile(r'^(default|opus|sonnet|haiku|opusplan|sonnet\[1m\])$')
 
 
 def log(*a):
@@ -175,6 +177,7 @@ class Agent:
             'fs_list': self.m_fs_list, 'fs_read': self.m_fs_read, 'fs_upload_target': self.m_fs_upload_target,
             'fs_download_source': self.m_fs_download_source,
             'git_status': self.m_git_status, 'git_diff': self.m_git_diff, 'git_log': self.m_git_log,
+            'claude_send': self.m_claude_send,
         }
 
     # -------------------------------------------------------------- output
@@ -583,6 +586,35 @@ class Agent:
             raise AgentError('not_found', f'сессии «{name}» нет', {'session': name})
         tmux.select_window(name, window)
         return {}
+
+    def m_claude_send(self, p):
+        """Quick actions for a running chat: a fixed command typed into the pane where that Claude runs (not the
+        window the tab happens to show). No free text: only these actions and model aliases."""
+        chat = p_chat(p)
+        action = p_str(p, 'action', pattern=CLAUDE_ACTION_RE)
+        if action == 'model':
+            model = p_str(p, 'model', pattern=CLAUDE_MODEL_RE)
+            text = f'/model {model}'
+        elif action != 'interrupt':
+            text = '/' + action
+        pr = sessions.by_chat(sessions.live()).get(chat)
+        pane = sessions.pane_id(pr)
+        if not pane or pane not in tmux.panes():
+            raise AgentError('not_found', 'этот чат не запущен в tmux', {'chatId': chat})
+        # typed text + Enter while Claude asks for permission would pick the first option (approve): commands only
+        # at the empty prompt of an idle Claude; Esc (interrupt) is safe in any state
+        if action != 'interrupt' and pr['status'] != 'idle':
+            raise AgentError('busy', 'Claude сейчас занят: дождитесь ответа или прервите его', {'status': pr['status']})
+        try:
+            if action == 'interrupt':
+                tmux.send_keys(pane, 'Escape')
+            else:
+                tmux.send_keys(pane, text, literal=True)
+                time.sleep(0.15)    # let the input box take the text before Enter (the slash menu filters as it types)
+                tmux.send_keys(pane, 'Enter')
+        except tmux.TmuxError as e:
+            raise AgentError('internal', f'tmux: {e}')
+        return {'pane': pane, 'status': pr['status']}
 
     def m_rename_session(self, p):
         name = p_session(p)

@@ -131,6 +131,23 @@ class ProtocolTest(unittest.TestCase):
         s = next(s for s in act if s['name'] == name)
         self.assertEqual(s['claude'][0]['chatId'], fx.ID_CUSTOM)
         self.assertEqual(s['claude'][0]['pane'], pane_id)
+        # quick actions go to that pane (the tty echoes them: the fake claude is just `sleep`); commands only when
+        # idle (Enter at a permission prompt would approve it), Esc any time
+        self.assertEqual(self.ag.call('claude_send', {'chatId': fx.ID_CUSTOM, 'action': 'compact'})['error']['code'],
+                         'busy')
+        self.ok('claude_send', {'chatId': fx.ID_CUSTOM, 'action': 'interrupt'})
+        self.fh.register(pane_pid, fx.ID_CUSTOM, 'idle', f'{name}:@1.{pane_id}')
+        self.assertEqual(self.ok('claude_send', {'chatId': fx.ID_CUSTOM, 'action': 'compact'})['pane'], pane_id)
+        self.assertIn('/compact', self.screen(name, '/compact'))
+        self.ok('claude_send', {'chatId': fx.ID_CUSTOM, 'action': 'model', 'model': 'sonnet'})
+        self.assertIn('/model sonnet', self.screen(name, '/model sonnet'))
+        for bad in ({'chatId': fx.ID_CUSTOM, 'action': 'model', 'model': 'x; rm'},
+                    {'chatId': fx.ID_CUSTOM, 'action': 'say', 'text': 'hi'},
+                    {'chatId': fx.ID_CUSTOM, 'action': 'model'}):
+            self.assertEqual(self.ag.call('claude_send', bad)['error']['code'], 'bad_request', bad)
+        self.assertEqual(self.ag.call('claude_send', {'chatId': fx.ID_ARCH, 'action': 'clear'})['error']['code'],
+                         'not_found')
+        self.fh.register(pane_pid, fx.ID_CUSTOM, 'waiting', f'{name}:@1.{pane_id}')   # back, for the checks below
         # chat is now "open" -> chats_changed upsert with open.session
         self.ag.wait_event('chats_changed', lambda d: any(c['id'] == fx.ID_CUSTOM and (c.get('open') or {}).get(
             'session') == name for c in d.get('upsert', []) + d.get('full', [])), timeout=5)

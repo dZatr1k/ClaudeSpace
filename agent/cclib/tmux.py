@@ -73,6 +73,13 @@ def panes():
     return m
 
 
+def send_keys(pane, *keys, literal=False):
+    """tmux send-keys to one pane (%N). literal: the text is typed as is, never read as key names."""
+    if not re.fullmatch(r'%\d{1,6}', pane or ''):
+        raise TmuxError('неверная панель')
+    run(['send-keys', '-t', pane] + (['-l'] if literal else []) + list(keys), check=True)
+
+
 def has_session(name):
     if not NAME_RE.match(name or ''):
         return False

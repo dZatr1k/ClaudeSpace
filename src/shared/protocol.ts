@@ -22,6 +22,9 @@ export const CHAT_ID_RE = /^[0-9a-f-]{36}$/;
 export const SESSION_RE = /^[A-Za-z0-9_-]{1,32}$/;
 
 const chatId = z.string().regex(CHAT_ID_RE);
+/** model aliases `/model` accepts; the agent has the same list (CLAUDE_MODEL_RE) */
+export const CLAUDE_MODELS = ['default', 'opus', 'sonnet', 'haiku', 'opusplan', 'sonnet[1m]'] as const;
+export type ClaudeModel = (typeof CLAUDE_MODELS)[number];
 const session = z.string().regex(SESSION_RE);
 const path = z
   .string()
@@ -110,6 +113,11 @@ export const methodSchemas = {
     .object({ path, file: path, staged: z.boolean().optional(), untracked: z.boolean().optional() })
     .strict(),
   git_log: z.object({ path, limit: z.number().int().min(1).max(200).optional() }).strict(),
+  // quick actions for a running chat: a fixed command typed into its Claude pane (no free text)
+  claude_send: z.discriminatedUnion('action', [
+    z.object({ chatId, action: z.enum(['interrupt', 'compact', 'clear']) }).strict(),
+    z.object({ chatId, action: z.literal('model'), model: z.enum(CLAUDE_MODELS) }).strict(),
+  ]),
 } as const;
 
 /** Methods only main may call (they keep state in main: mount ownership, tunnel). */
@@ -169,6 +177,7 @@ export interface MethodResults {
   git_status: GitStatus;
   git_diff: { root: string; file: string; diff: string; truncated: boolean; binary: boolean };
   git_log: { root: string | null; commits: GitCommit[] };
+  claude_send: { pane: string; status: string };
 }
 
 /** one entry of a folder listing (Files panel); ~/.ssh and Claude's secrets never appear */
@@ -257,6 +266,7 @@ export type ErrorCode =
   | 'exists'
   | 'chat_open'
   | 'not_allowed'
+  | 'busy'
   | 'tmux_error'
   | 'timeout'
   | 'too_large'

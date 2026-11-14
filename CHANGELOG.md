@@ -5,6 +5,9 @@
   markdown and images; paste a path into the chat, download to the PC, open in VS Code; drop files from the PC
   onto a folder to upload them.
 - Git tab: branch and upstream, changed files by group, recent commits, a diff viewer; changes are made in lazygit.
+- Claude bar under the terminal: the chat's status, Interrupt (Esc), Compact (/compact), Clear (/clear, asks
+  first) and a model menu (/model). Commands are typed into the pane where that Claude runs and only while it is
+  idle, so a click never answers a permission prompt. The same actions are in the Ctrl+K palette.
 - Two ClaudeSpace copies on one VM (say, a dev build and the installed app) no longer unmount each other's PC disk
   on exit.
 

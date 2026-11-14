@@ -823,6 +823,7 @@ DevTools — только в dev-сборке (`F12`).
 | `mosh_list` / `mosh_kill_stale` | — | `{servers: [{pid, ageSec, current}]}` / `{killed: int}` | 4 |
 | `resync` | — | `{}` — агент заново шлёт полные снимки всех `*_changed` | 2 |
 | `git_status` / `git_diff` / `git_log` | `{path}` / `{path, file, staged?, untracked?}` / `{path, limit?}` | панель Git, только чтение | 5 ✅ |
+| `claude_send` | `{chatId, action: interrupt\|compact\|clear\|model, model?}` | полоска «Действия с Claude» под терминалом и палитра: Esc или фиксированная команда (`/compact`, `/clear`, `/model <алиас>`) в панель tmux, где запущен этот Claude (`send-keys -l`, потом Enter). Своего текста нет. Команды только при статусе `idle`: Enter на запросе разрешения выбрал бы «Да»; Esc можно всегда. Ошибка `busy` | ✅ |
 | `fs_list` / `fs_read` | `{path}` | панель Файлы: папка, файл для просмотра (через защитный список) | 5 ✅ |
 | `fs_upload_target` / `fs_download_source` | `{dir, name}` / `{path}` | только main: проверить путь перед SFTP | 5 ✅ |
 | `search_chats` | `{query, limit?: int=50}` | `{hits: [{chatId, role, snippet, at}]}` | 6 |

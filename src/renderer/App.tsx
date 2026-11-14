@@ -11,6 +11,7 @@ import { RightPanel } from './components/RightPanel/RightPanel';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { StartScreen } from './components/Terminal/StartScreen';
 import { TerminalStack } from './components/Terminal/TerminalView';
+import { ClaudeBar } from './components/Terminal/ClaudeBar';
 import { Palette } from './components/Palette/Palette';
 import { SystemView } from './components/Overlays/SystemView';
 import { SettingsOverlay } from './components/Overlays/Settings';
@@ -106,13 +107,16 @@ export function App() {
                 />
               </>
             )}
-            <main className="relative min-w-0 flex-1">
-              <TerminalStack />
-              {tabsCount === 0 && (
-                <div className="absolute inset-0">
-                  <StartScreen />
-                </div>
-              )}
+            <main className="flex min-w-0 flex-1 flex-col">
+              <div className="relative min-h-0 flex-1">
+                <TerminalStack />
+                {tabsCount === 0 && (
+                  <div className="absolute inset-0">
+                    <StartScreen />
+                  </div>
+                )}
+              </div>
+              <ClaudeBar />
             </main>
             {rightOpen && (
               <>

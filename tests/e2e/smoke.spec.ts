@@ -135,6 +135,23 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await setTheme(win, 'light');
   await win.screenshot({ path: join(SHOTS, '13-session-light.png') });
   await setTheme(win, 'dark');
+  // Claude bar under the terminal: busy -> only «Прервать»; idle -> /compact typed into its pane
+  const bar = win.getByTestId('claude-bar');
+  await expect(bar).toContainText('думает');
+  await expect(bar.getByRole('button', { name: 'Сжать контекст' })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: 'Прервать' })).toBeVisible();
+  const reg = join(fh.home, '.claude', 'sessions', `${panePid}.json`);
+  writeFileSync(reg, readFileSync(reg, 'utf8').replace('"status":"busy"', '"status":"idle"'));
+  await expect(bar).toContainText('простаивает', { timeout: 5000 });
+  await expect(bar.getByRole('button', { name: 'Прервать' })).toHaveCount(0);
+  await bar.getByRole('button', { name: 'Сжать контекст' }).click();
+  await expect(win.locator('.xterm-rows').first()).toContainText('/compact', { timeout: 5000 });
+  await bar.getByRole('button', { name: 'Очистить' }).click();
+  await expect(win.getByRole('dialog')).toContainText('Начать разговор заново?');
+  await win.screenshot({ path: join(SHOTS, '18-claude-bar.png') });
+  await win.keyboard.press('Escape');
+  writeFileSync(reg, readFileSync(reg, 'utf8').replace('"status":"idle"', '"status":"busy"'));
+  await expect(bar).toContainText('думает', { timeout: 5000 });
   // chat title -> the chat in the «Чаты» list, selected
   await info.getByTitle('Показать в списке чатов').click();
   await expect(win.getByRole('tab', { name: 'Чаты' })).toHaveAttribute('aria-selected', 'true');
