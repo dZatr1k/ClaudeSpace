@@ -60,8 +60,10 @@ jobs:
       - name: python3 alias
         shell: pwsh
         run: |
-          $py = (Get-Command python).Source
-          Copy-Item $py (Join-Path (Split-Path $py) 'python3.exe')
+          # setup-python may already ship python3.exe next to python.exe; add the alias only if it is missing
+          $dir = Split-Path (Get-Command python).Source
+          $alias = Join-Path $dir 'python3.exe'
+          if (-not (Test-Path $alias)) { Copy-Item (Join-Path $dir 'python.exe') $alias }
           python3 --version
       - run: npm ci
       # typecheck + agent bundle + electron-vite build
