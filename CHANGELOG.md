@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 - Files tab: the folder of the current chat, project or session as a tree with git marks; a viewer for text,
   markdown and images; paste a path into the chat, download to the PC, open in VS Code; drop files from the PC
   onto a folder to upload them.
