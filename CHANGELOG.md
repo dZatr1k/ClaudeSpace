@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.1
 - Claude bar: text you had started typing no longer gets the command appended to it. The app puts the draft
   aside with Claude Code's own stash (Ctrl+S), and Claude Code brings it back once the command has run.
 - Syntax highlighting in the file viewer for common languages (TypeScript, Python, C#, shell, JSON, YAML and
