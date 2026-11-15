@@ -174,6 +174,8 @@ export interface Hello {
   home: string;
   claudeVersion: string | null;
   tmux: string | null;
+  /** rows the tmux status line takes and whether it is at the top (absent: older agent) */
+  tmuxStatus?: { lines: number; top: boolean };
   capabilities: string[];
   warnings: string[];
 }

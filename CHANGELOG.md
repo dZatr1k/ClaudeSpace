@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+- The tmux status line (session name, clock, host) is hidden in the app's terminals: tmux gets one more row than
+  the window shows and that row is cut off, so SSH and phone clients keep their status line. Settings →
+  Terminal → «Прятать строку tmux» turns it back on.
+- Split view: each pane has a thin header with the project name, the chat title and its state.
+
 ## 0.7.2
 - WebGL terminal renderer draws glyphs at full size. The cause of the small letters: Electron's canvas rejects a
   font value that starts with a space and falls back to 10px, and xterm builds its glyph font that way. The app

@@ -46,6 +46,8 @@ export const settingsSchema = z.object({
       ctrlCCopies: z.boolean().default(true),
       ctrlVPastes: z.boolean().default(true),
       warnMultilinePaste: z.boolean().default(true),
+      // the tmux status line is cut off in the app's terminals (tmux gets extra rows; SSH clients keep theirs)
+      hideTmuxStatus: z.boolean().default(true),
     })
     .prefault({}),
   startup: z

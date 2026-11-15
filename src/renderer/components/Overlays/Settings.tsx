@@ -705,6 +705,12 @@ export function SettingsOverlay() {
                   onChange={(v) => void patch({ terminal: { renderer: v } })}
                 />
               </Row>
+              <Row label={t.settings.hideTmuxStatus} hint={t.settings.hideTmuxStatusHint}>
+                <Toggle
+                  checked={s.terminal.hideTmuxStatus}
+                  onChange={(v) => void patch({ terminal: { hideTmuxStatus: v } })}
+                />
+              </Row>
               <Row label={t.settings.scrollback}>
                 <Num
                   value={s.terminal.scrollback}

@@ -31,6 +31,8 @@ export interface TermHandle {
   ackTimer: number | null;
   received: number;
   webgl: WebglAddon | null;
+  /** attached to a tmux session: its status line can be cut off (settings.terminal.hideTmuxStatus) */
+  tmux: boolean;
 }
 
 const handles = new Map<string, TermHandle>();
@@ -99,6 +101,7 @@ export function createHandle(tab: Tab): TermHandle {
     ackTimer: null,
     received: 0,
     webgl: null,
+    tmux: tab.kind === 'tmux',
   };
   term.onData((data) => sendInput(tab.id, data, false));
   term.onBinary((data) => sendInput(tab.id, data, true));
@@ -272,9 +275,34 @@ export function disposeHandle(tabId: string): void {
   h.term.dispose();
 }
 
+/** rows of the tmux status line to cut off in this terminal (0: show it) and whether they are at the top */
+function hiddenStatus(h: TermHandle): { lines: number; top: boolean } {
+  const st = useData.getState().hello?.tmuxStatus ?? { lines: 1, top: false };
+  return h.tmux && (settings()?.terminal.hideTmuxStatus ?? true) ? st : { lines: 0, top: false };
+}
+
+/** Fit the terminal to its host. With the tmux status line hidden, tmux gets that many extra rows and they fall
+ * outside the host (overflow: hidden), below it or, for a status line at the top, above it. */
 export function safeFit(h: TermHandle): { cols: number; rows: number } {
   try {
-    if (h.host && h.host.clientWidth > 20 && h.host.clientHeight > 20) h.fit.fit();
+    if (h.host && h.host.clientWidth > 20 && h.host.clientHeight > 20) {
+      const d = h.fit.proposeDimensions();
+      const hide = hiddenStatus(h);
+      if (d && Number.isFinite(d.cols) && Number.isFinite(d.rows)) {
+        const rows = d.rows + hide.lines;
+        if (d.cols !== h.term.cols || rows !== h.term.rows) h.term.resize(d.cols, rows);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cellH: number = (h.term as any)._core?._renderService?.dimensions?.css?.cell?.height ?? 0;
+      // the screen is rows × cell tall; the hidden rows are clipped exactly (the host keeps a leftover strip of less
+      // than a row, which would otherwise show part of the status line), a top status line also moves up
+      const screen = h.term.element?.querySelector<HTMLElement>('.xterm-screen');
+      if (screen) {
+        const px = hide.lines * cellH;
+        screen.style.clipPath = px ? (hide.top ? `inset(${px}px 0 0 0)` : `inset(0 0 ${px}px 0)`) : '';
+        screen.style.marginTop = px && hide.top ? `${-px}px` : '';
+      }
+    }
   } catch {
     /* not visible yet */
   }
@@ -450,6 +478,9 @@ export function wireTerminals(): void {
   // once online and the first active_changed arrived: reattach tabs that were waiting
   useData.subscribe((d, prev) => {
     if (d.sessionsSynced && !prev.sessionsSynced) reattachAll();
+    // the agent says how tall the tmux status line is: tmux terminals get their row count again
+    if (JSON.stringify(d.hello?.tmuxStatus) !== JSON.stringify(prev.hello?.tmuxStatus))
+      for (const h of handles.values()) if (h.tmux) safeFit(h);
   });
 }
 

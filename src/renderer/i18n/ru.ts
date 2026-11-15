@@ -600,6 +600,9 @@ export const ru = {
     renderer: 'Отрисовка',
     rendererDom: 'DOM (как в браузере)',
     rendererWebgl: 'WebGL (экспериментально)',
+    hideTmuxStatus: 'Прятать строку tmux',
+    hideTmuxStatusHint:
+      'Нижняя строка tmux с именем сессии и часами не показывается в окнах приложения. В SSH и на телефоне она остаётся.',
     webglBroken: (pct: number) =>
       `WebGL рисовал буквы на ${pct}% от нужного размера, поэтому терминал переключён на DOM. Вернуть WebGL можно в Настройки → Терминал.`,
     rendererHint: 'WebGL быстрее при большом потоке текста. Если буквы выглядят странно, верните DOM.',

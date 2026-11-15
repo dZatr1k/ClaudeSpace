@@ -210,7 +210,8 @@ class Agent:
         self.emit('hello', {
             'protocol': PROTOCOL, 'agent': AGENT_VERSION, 'hash': own_hash(), 'python': platform.python_version(),
             'host': os.environ.get('CSAGENT_HOSTNAME') or socket.gethostname().split('.')[0], 'user': getpass.getuser(), 'home': paths.P.home,
-            'claudeVersion': self.claude_ver, 'tmux': tmux.version(), 'capabilities': caps, 'warnings': warnings,
+            'claudeVersion': self.claude_ver, 'tmux': tmux.version(), 'tmuxStatus': tmux.status_layout(), 'capabilities': caps,
+            'warnings': warnings,
         })
 
     # -------------------------------------------------------------- snapshots

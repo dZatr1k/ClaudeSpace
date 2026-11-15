@@ -80,6 +80,14 @@ def send_keys(pane, *keys, literal=False):
     run(['send-keys', '-t', pane] + (['-l'] if literal else []) + list(keys), check=True)
 
 
+def status_layout():
+    """-> {lines, top}: how many rows the tmux status line takes and where (global options; default 1, bottom)."""
+    st = run(['show-options', '-gv', 'status']).strip()
+    pos = run(['show-options', '-gv', 'status-position']).strip()
+    lines = 0 if st == 'off' else int(st) if st.isdigit() and 2 <= int(st) <= 5 else 1
+    return {'lines': lines, 'top': pos == 'top'}
+
+
 def capture(pane):
     """the visible screen of one pane with colours and attributes (escape sequences), '' if it fails"""
     if not re.fullmatch(r'%\d{1,6}', pane or ''):

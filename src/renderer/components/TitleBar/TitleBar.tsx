@@ -27,6 +27,7 @@ import { SPLIT_MODES } from '../../lib/panes';
 import { t } from '../../i18n/ru';
 import { formatAgo } from '../../lib/format';
 import { sessionStatus } from '../../lib/status';
+import { tabStatus, useTabInfo } from '../../lib/tabInfo';
 import { useConn } from '../../stores/conn';
 import { useData } from '../../stores/data';
 import { useTabs } from '../../stores/tabs';
@@ -210,17 +211,6 @@ function SplitMenu() {
   );
 }
 
-function tabStatus(
-  tab: Tab,
-  sessionsStatus: Map<string, { ui: UiStatus; raw: string | null }>,
-  online: boolean,
-): UiStatus {
-  if (!online || tab.term === 'offline') return 'offline';
-  if (tab.term === 'ended' || tab.term === 'error') return 'error';
-  if (tab.kind !== 'tmux') return 'none';
-  return (tab.session && sessionsStatus.get(tab.session)?.ui) || 'none';
-}
-
 function TabButton({
   tab,
   index,
@@ -232,13 +222,9 @@ function TabButton({
   active: boolean;
   status: UiStatus;
 }) {
-  const sessions = useData((d) => d.sessions);
-  const chats = useData((d) => d.chats);
-  const s = tab.session ? sessions.find((x) => x.name === tab.session) : undefined;
-  const chat = s?.claude[0] ? chats[s.claude[0].chatId] : tab.chatId ? chats[tab.chatId] : undefined;
-  // title: session name; if Claude runs in it — project folder name
-  const title = chat?.project ? chat.project.split('/').pop() || tab.title : tab.title;
-  const tip = [chat?.title, s?.path ?? tab.cwd, t.status[status] || status].filter(Boolean).join('\n');
+  const info = useTabInfo(tab);
+  const title = info.title;
+  const tip = [info.chatTitle, info.path, t.status[status] || status].filter(Boolean).join('\n');
   return (
     <ContextMenu items={() => tabMenu(tab)}>
       <div

@@ -12,8 +12,10 @@ import { useData } from '../../stores/data';
 import { attachDroppedFiles } from '../../lib/images';
 import { useTabs } from '../../stores/tabs';
 import { paneRect } from '../../lib/panes';
+import { useTabInfo } from '../../lib/tabInfo';
 import { useUi } from '../../stores/ui';
 import { Button } from '../ui/Button';
+import { StatusIcon } from '../ui/StatusIcon';
 import { ContextMenu } from '../ui/Menu';
 import { createHandle, getHandle, mountHandle, openChannel, safeFit, writeToTab } from './controller';
 
@@ -207,6 +209,23 @@ function TermOverlay({ tab }: { tab: Tab }) {
   }
 }
 
+/** split view: which chat a pane shows (the tab strip is far away once there are four panes) */
+function PaneHeader({ tab, active }: { tab: Tab; active: boolean }) {
+  const info = useTabInfo(tab);
+  return (
+    <div
+      className={`flex h-6 shrink-0 items-center gap-1.5 border-b border-line px-2 text-[12px] ${active ? 'bg-surface text-fg' : 'text-muted'}`}
+      title={[info.chatTitle, info.path].filter(Boolean).join('\n')}
+    >
+      {tab.kind === 'tmux' ? <StatusIcon status={info.status} size={12} /> : null}
+      <span className={`truncate ${active ? 'font-medium' : ''}`}>{info.title}</span>
+      {info.chatTitle && info.chatTitle !== info.title && (
+        <span className="min-w-0 truncate text-faint">· {info.chatTitle}</span>
+      )}
+    </div>
+  );
+}
+
 /** pane: where this tab sits in split view (lib/panes.ts), null = not on screen; active = the focused one */
 export function TerminalView({
   tab,
@@ -305,7 +324,7 @@ export function TerminalView({
   const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files');
   return (
     <div
-      className={`absolute ${pane ? '' : 'invisible pointer-events-none'} ${pane?.split && pane.rect.left > 0 ? 'border-l border-line' : ''} ${pane?.split && pane.rect.top > 0 ? 'border-t border-line' : ''}`}
+      className={`absolute flex flex-col ${pane ? '' : 'invisible pointer-events-none'} ${pane?.split && pane.rect.left > 0 ? 'border-l border-line' : ''} ${pane?.split && pane.rect.top > 0 ? 'border-t border-line' : ''}`}
       style={
         pane
           ? {
@@ -352,11 +371,12 @@ export function TerminalView({
         }
       }}
     >
+      {pane?.split && <PaneHeader tab={tab} active={active} />}
       <ContextMenu items={menu}>
         <div
           ref={hostRef}
           style={{ opacity: dimmed ? 0.45 : 1, background: 'var(--bg-base)' }}
-          className="h-full w-full transition-opacity duration-200"
+          className="min-h-0 w-full flex-1 overflow-hidden transition-opacity duration-200"
         />
       </ContextMenu>
       {pane && <TermOverlay tab={tab} />}

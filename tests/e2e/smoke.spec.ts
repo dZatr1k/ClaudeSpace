@@ -373,6 +373,14 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await win.keyboard.press('Control+Shift+S');
   await expect(win.locator('[data-pane="1"]')).toBeVisible({ timeout: 10_000 });
   await expect(empty).toBeHidden();
+  // each pane says which chat it shows; the tmux status line of the Claude pane is cut off (one row clipped)
+  await expect(win.locator('[data-pane="0"]')).toContainText('· Починка сборки');
+  expect(
+    await win.locator('[data-pane="0"] .xterm-screen').evaluate((el) => (el as HTMLElement).style.clipPath),
+  ).toMatch(/^inset\(0px 0px [1-9]\d*px/);
+  expect(
+    await win.locator('[data-pane="1"] .xterm-screen').evaluate((el) => (el as HTMLElement).style.clipPath),
+  ).toBe(''); // a shell tab has no tmux
   await win.screenshot({ path: join(SHOTS, '25-split.png') });
   await win.locator('[data-pane="0"]').click({ position: { x: 200, y: 200 } });
   await expect(win.getByTestId('claude-bar')).toBeVisible(); // focus is back on the Claude tab
