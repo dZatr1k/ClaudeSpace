@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.2
 - WebGL terminal renderer draws glyphs at full size. The cause of the small letters: Electron's canvas rejects a
   font value that starts with a space and falls back to 10px, and xterm builds its glyph font that way. The app
   now trims the value. The self-check measures glyph height on the real terminal too and still switches to DOM
