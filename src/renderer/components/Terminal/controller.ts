@@ -6,7 +6,8 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { probeWebgl } from '../../lib/webglProbe';
+import { checkLive, probeWebgl } from '../../lib/webglProbe';
+import type { ProbeResult } from '../../lib/webglProbe';
 import { ClipboardAddon } from '@xterm/addon-clipboard';
 import type { Tab } from '@shared/model';
 import type { Settings } from '@shared/settings';
@@ -155,16 +156,42 @@ function webglChecked(): boolean {
         for (const x of handles.values()) syncRenderer(x);
         return true;
       }
-      const ui = useUi.getState();
-      void invoke('settings.set', { terminal: { renderer: 'dom' } }).then((next) => {
-        ui.set({ settings: next });
-        probeOverridable = true;
-      });
-      ui.toast(t.settings.webglBroken(Math.round((r.ratio ?? 0) * 100)), 'info', undefined, 10_000);
+      webglFailed(r);
       return false;
     });
   }
   return false;
+}
+
+/** glyphs came out too small: switch the setting to DOM (which detaches WebGL everywhere) and say so */
+function webglFailed(r: ProbeResult): void {
+  const ui = useUi.getState();
+  probeOverridable = true;
+  void invoke('settings.set', { terminal: { renderer: 'dom' } }).then((next) => {
+    ui.set({ settings: next });
+    for (const x of handles.values()) syncRenderer(x);
+  });
+  ui.toast(t.settings.webglBroken(Math.round((r.ratio ?? 0) * 100)), 'info', undefined, 10_000);
+}
+
+/** The off-screen probe passed, but the real terminal may still differ: once per run, the first visible terminal
+ * that draws with WebGL is measured too (checkLive), logged, and switched back to DOM if its glyphs are too small. */
+let liveChecked = false;
+function scheduleLiveCheck(h: TermHandle): void {
+  if (liveChecked || probeOverridable) return;
+  let tries = 0;
+  const run = () => {
+    if (liveChecked || !h.webgl || !h.host) return;
+    const r = h.host.clientWidth > 50 ? checkLive(h.term, h.host) : null;
+    if (!r || (r.ratio === null && ++tries < 10)) {
+      window.setTimeout(run, 3000); // hidden tab or nothing on screen yet
+      return;
+    }
+    liveChecked = true;
+    void invoke('diag.log', { text: `[webgl-live] ${JSON.stringify(r).slice(0, 4000)}` });
+    if (!r.ok) webglFailed(r);
+  };
+  window.setTimeout(run, 1500);
 }
 
 /** WebGL or the built-in DOM renderer, per settings; switching works on a live terminal. WebGL is attached only
@@ -176,13 +203,14 @@ function syncRenderer(h: TermHandle): void {
     h.webgl = null;
   } else if (want && !h.webgl && h.opened) {
     try {
-      const gl = new WebglAddon();
+      const gl = new WebglAddon(true); // preserveDrawingBuffer: the live check reads the canvas back
       gl.onContextLoss(() => {
         gl.dispose();
         h.webgl = null;
       });
       h.term.loadAddon(gl);
       h.webgl = gl;
+      scheduleLiveCheck(h);
     } catch {
       h.webgl = null; // DOM renderer fallback
     }

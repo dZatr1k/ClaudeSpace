@@ -152,6 +152,14 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
       timeout: 10_000,
     })
     .toMatch(/"ok":true/);
+  // the canvas font setter accepts a value with a leading space (xterm's WebGL atlas font starts with one)
+  expect(
+    await win.evaluate(() => {
+      const ctx = document.createElement('canvas').getContext('2d')!;
+      ctx.font = ' normal 15px serif';
+      return ctx.font;
+    }),
+  ).toBe('15px serif');
   // narrow window (minimum size): the right panel hides itself, the tab strip and the status bar must still fit
   await win.setViewportSize({ width: 960, height: 600 });
   await win.waitForTimeout(300);

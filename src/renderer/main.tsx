@@ -1,4 +1,5 @@
 import './styles.css';
+import './lib/canvasFont';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Tab, Workspace } from '@shared/model';

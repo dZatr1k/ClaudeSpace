@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+- WebGL terminal renderer draws glyphs at full size. The cause of the small letters: Electron's canvas rejects a
+  font value that starts with a space and falls back to 10px, and xterm builds its glyph font that way. The app
+  now trims the value. The self-check measures glyph height on the real terminal too and still switches to DOM
+  if something goes wrong.
+
 ## 0.7.1
 - Claude bar: text you had started typing no longer gets the command appended to it. The app puts the draft
   aside with Claude Code's own stash (Ctrl+S), and Claude Code brings it back once the command has run.
