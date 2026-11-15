@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.5
+- Claude settings: every list is split into collapsible groups by whose it is (all projects, a project, a plugin);
+  memory notes are grouped by project, CLAUDE.md files by folder. Other projects' notes start collapsed. Groups
+  you open or close stay that way while the app runs.
+- Claude settings → Plugins: each plugin lists the skills and hooks it brings.
+
 ## 0.7.4
 - Settings: every setting explains itself in a hint that shows when the pointer rests on its name (or the «?»
   next to it), or on keyboard focus. States and warnings stay visible. Rewritten hints, shorter labels, fixed
