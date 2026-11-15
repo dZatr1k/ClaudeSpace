@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.4
 - Settings: every setting explains itself in a hint that shows when the pointer rests on its name (or the «?»
   next to it), or on keyboard focus. States and warnings stay visible. Rewritten hints, shorter labels, fixed
   layouts of the Connection and PC ↔ VM tabs, an outdated note about Claude Code colours removed.
