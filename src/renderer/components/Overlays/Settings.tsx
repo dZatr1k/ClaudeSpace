@@ -1,3 +1,5 @@
+import * as Tooltip from '@radix-ui/react-tooltip';
+import { CircleHelp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { SshHostsInfo } from '@shared/ipc';
@@ -22,15 +24,62 @@ async function patch(p: SettingsPatch) {
   useUi.getState().set({ settings: next });
 }
 
-function Row({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+/**
+ * One setting. hint: what the setting does, hidden until asked for (hover over the name or the «?», or keyboard
+ * focus anywhere in the row), so the list stays short. note: a state or a warning, always visible.
+ */
+function Row({
+  label,
+  children,
+  hint,
+  note,
+}: {
+  label: string;
+  children: ReactNode;
+  hint?: string;
+  note?: ReactNode;
+}) {
+  const [hover, setHover] = useState(false);
+  const [focus, setFocus] = useState(false);
   return (
-    <label className="flex items-start gap-4 border-b border-line py-2.5 text-[13px] last:border-b-0">
-      <span className="w-52 shrink-0 pt-1 leading-snug">{label}</span>
-      <span className="min-w-0 flex-1">
-        {children}
-        {hint && <div className="mt-1 text-[12px] leading-snug text-faint">{hint}</div>}
-      </span>
-    </label>
+    <Tooltip.Root open={!!hint && (hover || focus)} onOpenChange={setHover} delayDuration={350}>
+      <label
+        className="group flex items-start gap-4 border-b border-line py-2.5 text-[13px] last:border-b-0"
+        onFocus={(e) => e.target.matches(':focus-visible') && setFocus(true)}
+        onBlur={() => setFocus(false)}
+      >
+        <Tooltip.Trigger asChild>
+          <span className="flex w-52 shrink-0 items-start gap-1.5 pt-1 leading-snug">
+            <span>{label}</span>
+            {hint && (
+              <CircleHelp
+                size={13}
+                className="mt-[3px] shrink-0 text-faint transition-colors duration-100 group-hover:text-muted"
+                aria-hidden
+              />
+            )}
+          </span>
+        </Tooltip.Trigger>
+        <span className="min-w-0 flex-1">
+          {children}
+          {note && <div className="mt-1 text-[12px] leading-snug text-muted">{note}</div>}
+        </span>
+        {hint && (
+          <Tooltip.Portal>
+            <Tooltip.Content
+              side="bottom"
+              align="start"
+              sideOffset={6}
+              collisionPadding={12}
+              className="z-[60] max-w-[360px] rounded-[6px] border border-line-strong bg-elevated px-3 py-2 text-[12px] leading-relaxed text-fg shadow-pop"
+            >
+              {hint}
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        )}
+        {hint && <span className="sr-only">. {hint}</span>}
+      </label>
+    </Tooltip.Root>
   );
 }
 
@@ -41,10 +90,12 @@ function Text({
   value,
   onCommit,
   placeholder,
+  disabled,
 }: {
   value: string;
   onCommit: (v: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
@@ -53,6 +104,7 @@ function Text({
       className={inputCls}
       value={v}
       placeholder={placeholder}
+      disabled={disabled}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => v !== value && onCommit(v)}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
@@ -126,7 +178,7 @@ function Choice<T extends string>({
           type="button"
           role="radio"
           aria-checked={value === o.v}
-          className={`h-6 rounded-[4px] px-3 text-[12px] transition-colors duration-100 ${value === o.v ? 'bg-selected font-semibold text-fg' : 'text-muted hover:bg-hover hover:text-fg'}`}
+          className={`h-6 whitespace-nowrap rounded-[4px] px-3 text-[12px] transition-colors duration-100 ${value === o.v ? 'bg-selected font-semibold text-fg' : 'text-muted hover:bg-hover hover:text-fg'}`}
           onClick={() => onChange(o.v)}
         >
           {o.label}
@@ -178,7 +230,7 @@ function ConnectionSection({ s }: { s: S }) {
   const manual = s.connection.manual;
   return (
     <>
-      <Row label={t.settings.mode}>
+      <Row label={t.settings.mode} hint={t.settings.hints.mode}>
         <Choice
           value={s.connection.mode}
           options={[
@@ -192,12 +244,25 @@ function ConnectionSection({ s }: { s: S }) {
         <>
           <Row
             label={t.settings.host}
-            hint={
-              hosts
-                ? hosts.found
-                  ? t.settings.hostFile(hosts.configPath)
-                  : t.settings.hostNoFile(hosts.configPath)
-                : undefined
+            hint={t.settings.hints.host}
+            note={
+              hosts ? (
+                <span className="mono block break-all text-[12px]">
+                  {hosts.resolved && !manual && (
+                    <>
+                      {hosts.resolved.user}@{hosts.resolved.hostname}:{hosts.resolved.port}
+                      <br />
+                      {hosts.resolved.identityFile ?? t.settings.defaultKey}
+                      <br />
+                    </>
+                  )}
+                  <span className="text-faint">
+                    {hosts.found
+                      ? t.settings.hostFile(hosts.configPath)
+                      : t.settings.hostNoFile(hosts.configPath)}
+                  </span>
+                </span>
+              ) : undefined
             }
           >
             <div className="flex gap-2">
@@ -220,22 +285,16 @@ function ConnectionSection({ s }: { s: S }) {
                 <option value="__manual">{t.settings.manual}</option>
               </select>
             </div>
-            {hosts?.resolved && !manual && (
-              <div className="mono mt-1 text-[12px] text-muted">
-                {hosts.resolved.user}@{hosts.resolved.hostname}:{hosts.resolved.port} ·{' '}
-                {hosts.resolved.identityFile ?? t.settings.defaultKey}
-              </div>
-            )}
           </Row>
           {manual && (
             <>
-              <Row label={t.settings.manualHost}>
+              <Row label={t.settings.manualHost} hint={t.settings.hints.manualHost}>
                 <Text
                   value={manual.hostname}
                   onCommit={(v) => void patch({ connection: { manual: { ...manual, hostname: v } } })}
                 />
               </Row>
-              <Row label={t.settings.manualPort}>
+              <Row label={t.settings.manualPort} hint={t.settings.hints.manualPort}>
                 <Num
                   value={manual.port}
                   min={1}
@@ -243,13 +302,13 @@ function ConnectionSection({ s }: { s: S }) {
                   onCommit={(v) => void patch({ connection: { manual: { ...manual, port: v } } })}
                 />
               </Row>
-              <Row label={t.settings.manualUser}>
+              <Row label={t.settings.manualUser} hint={t.settings.hints.manualUser}>
                 <Text
                   value={manual.user}
                   onCommit={(v) => void patch({ connection: { manual: { ...manual, user: v } } })}
                 />
               </Row>
-              <Row label={t.settings.manualKey}>
+              <Row label={t.settings.manualKey} hint={t.settings.hints.manualKey}>
                 <Text
                   value={manual.keyPath}
                   placeholder="~/.ssh/id_ed25519"
@@ -258,7 +317,7 @@ function ConnectionSection({ s }: { s: S }) {
               </Row>
             </>
           )}
-          <Row label={t.settings.keepalive}>
+          <Row label={t.settings.keepalive} hint={t.settings.hints.keepalive}>
             <Num
               value={s.connection.keepaliveSec}
               min={5}
@@ -278,17 +337,16 @@ function NotificationsSection({ s }: { s: S }) {
   useEffect(() => setVol(n.volume), [n.volume]);
   return (
     <>
-      <div className="mb-1 text-[12px] leading-snug text-muted">{t.settings.notifyHint}</div>
-      <Row label={t.settings.notifySystem}>
+      <Row label={t.settings.notifySystem} hint={t.settings.hints.notifySystem}>
         <Toggle checked={n.system} onChange={(v) => void patch({ notifications: { system: v } })} />
       </Row>
-      <Row label={t.settings.notifyToast}>
+      <Row label={t.settings.notifyToast} hint={t.settings.hints.notifyToast}>
         <Toggle checked={n.toast} onChange={(v) => void patch({ notifications: { toast: v } })} />
       </Row>
-      <Row label={t.settings.notifySound}>
+      <Row label={t.settings.notifySound} hint={t.settings.hints.notifySound}>
         <Toggle checked={n.sound} onChange={(v) => void patch({ notifications: { sound: v } })} />
       </Row>
-      <Row label={t.settings.notifyVolume}>
+      <Row label={t.settings.notifyVolume} hint={t.settings.hints.notifyVolume}>
         <span className="flex items-center gap-2">
           <input
             type="range"
@@ -327,21 +385,38 @@ function NotificationsSection({ s }: { s: S }) {
           </Button>
         </span>
       </Row>
-      <Row label={t.settings.notifyFile} hint={t.settings.notifyFileHint}>
-        <input
-          className={`${inputCls.replace('w-full', '')} w-80`}
-          placeholder="%USERPROFILE%\\.claude\\sounds\\sound.wav"
-          defaultValue={n.soundFile}
-          disabled={!n.sound}
-          onBlur={(e) =>
-            e.target.value !== n.soundFile && void patch({ notifications: { soundFile: e.target.value } })
-          }
-        />
+      <Row label={t.settings.notifyFile} hint={t.settings.hints.notifyFile}>
+        <span className="flex items-center gap-2">
+          <Text
+            value={n.soundFile}
+            placeholder={'%USERPROFILE%\\.claude\\sounds\\sound.wav'}
+            disabled={!n.sound}
+            onCommit={(v) => void patch({ notifications: { soundFile: v } })}
+          />
+          <Button
+            small
+            disabled={!n.sound}
+            onClick={() =>
+              void invoke('sound.pick').then((f) => f && void patch({ notifications: { soundFile: f } }))
+            }
+          >
+            {t.settings.browse}
+          </Button>
+          {n.soundFile && (
+            <Button
+              small
+              disabled={!n.sound}
+              onClick={() => void patch({ notifications: { soundFile: '' } })}
+            >
+              {t.settings.soundDefault}
+            </Button>
+          )}
+        </span>
       </Row>
-      <Row label={t.ports.notifyNew}>
+      <Row label={t.ports.notifyNew} hint={t.settings.hints.portsNew}>
         <Toggle checked={s.ports.notifyNew} onChange={(v) => void patch({ ports: { notifyNew: v } })} />
       </Row>
-      <Row label={t.settings.notifyOnlyBackground}>
+      <Row label={t.settings.notifyOnlyBackground} hint={t.settings.hints.onlyBackground}>
         <Toggle
           checked={n.onlyBackground}
           onChange={(v) => void patch({ notifications: { onlyBackground: v } })}
@@ -362,7 +437,6 @@ function PcLinkSection({ s }: { s: S }) {
   const valid = SRC_RE.test(src.trim()) && DST_RE.test(dst.trim());
   return (
     <>
-      <div className="mb-1 text-[12px] leading-snug text-muted">{t.pclink.hint}</div>
       <Row label={t.pclink.state}>
         <span className="flex items-center gap-2 pt-1">
           <span>{pcLinkText(st)}</span>
@@ -384,7 +458,7 @@ function PcLinkSection({ s }: { s: S }) {
           onChange={(v) => void patch({ pcLink: { tunnel: v } })}
         />
       </Row>
-      <Row label={t.pclink.autoMount}>
+      <Row label={t.pclink.autoMount} hint={t.pclink.autoMountHint}>
         <Toggle checked={p.autoMount} onChange={(v) => void patch({ pcLink: { autoMount: v } })} />
       </Row>
       <Row label={t.pclink.mounts} hint={t.pclink.mountsHint}>
@@ -404,14 +478,16 @@ function PcLinkSection({ s }: { s: S }) {
           ))}
           <div className="flex items-center gap-2">
             <input
-              className={`${inputCls.replace('w-full', '')} w-40`}
+              aria-label={t.pclink.srcLabel}
+              className={`${inputCls.replace('w-full', '')} min-w-0 flex-1`}
               placeholder={t.pclink.srcPh}
               value={src}
               onChange={(e) => setSrc(e.target.value)}
             />
-            <span>→</span>
+            <span aria-hidden>→</span>
             <input
-              className={`${inputCls.replace('w-full', '')} w-40`}
+              aria-label={t.pclink.dstLabel}
+              className={`${inputCls.replace('w-full', '')} min-w-0 flex-1`}
               placeholder={t.pclink.dstPh}
               value={dst}
               onChange={(e) => setDst(e.target.value)}
@@ -449,14 +525,18 @@ function StartupTray({ s }: { s: S }) {
       <Row label={t.settings.closeToTray} hint={t.settings.closeToTrayHint}>
         <Toggle checked={s.tray.closeToTray} onChange={(v) => void patch({ tray: { closeToTray: v } })} />
       </Row>
-      <Row label={t.settings.autostart} hint={autostartHint}>
+      <Row
+        label={t.settings.autostart}
+        hint={t.settings.autostartHint}
+        note={autostartOk ? undefined : autostartHint}
+      >
         <Toggle
           checked={s.startup.autostart}
           disabled={!autostartOk}
           onChange={(v) => void patch({ startup: { autostart: v } })}
         />
       </Row>
-      <Row label={t.settings.startHidden}>
+      <Row label={t.settings.startHidden} hint={t.settings.hints.startHidden}>
         <Toggle
           checked={s.startup.startHidden}
           disabled={!autostartOk || !s.startup.autostart}
@@ -585,201 +665,206 @@ export function SettingsOverlay() {
       title={t.settings.title}
       width={820}
     >
-      <div className="flex min-h-[440px] gap-5">
-        <nav className="flex w-40 shrink-0 flex-col gap-0.5 border-r border-line pr-3">
-          {nav.map((x) => (
-            <button
-              key={x.id}
-              aria-current={section === x.id ? 'page' : undefined}
-              className={`relative h-8 rounded-[6px] px-2.5 text-left text-[13px] transition-colors duration-100 ${section === x.id ? 'bg-selected font-semibold' : 'text-muted hover:bg-hover hover:text-fg'}`}
-              onClick={() => useUi.getState().set({ settingsOpen: x.id })}
-            >
-              {x.label}
-            </button>
-          ))}
-        </nav>
-        <div className="min-w-0 flex-1" data-settings={section}>
-          {section === 'connection' && <ConnectionSection s={s} />}
-          {section === 'pclink' && <PcLinkSection s={s} />}
-          {section === 'sudo' && <SudoSection s={s} />}
-          {section === 'appearance' && (
-            <>
-              <Row label={t.settings.theme}>
-                <div className="flex gap-2" role="radiogroup" aria-label={t.settings.theme}>
-                  <ThemeCard
-                    id="system"
-                    label={t.settings.themeSystem}
-                    active={s.appearance.theme === 'system'}
+      <Tooltip.Provider delayDuration={350} skipDelayDuration={200}>
+        <div className="flex min-h-[440px] gap-5">
+          <nav className="flex w-40 shrink-0 flex-col gap-0.5 border-r border-line pr-3">
+            {nav.map((x) => (
+              <button
+                key={x.id}
+                aria-current={section === x.id ? 'page' : undefined}
+                className={`relative h-8 rounded-[6px] px-2.5 text-left text-[13px] transition-colors duration-100 ${section === x.id ? 'bg-selected font-semibold' : 'text-muted hover:bg-hover hover:text-fg'}`}
+                onClick={() => useUi.getState().set({ settingsOpen: x.id })}
+              >
+                {x.label}
+              </button>
+            ))}
+          </nav>
+          <div className="min-w-0 flex-1" data-settings={section}>
+            {section === 'connection' && <ConnectionSection s={s} />}
+            {section === 'pclink' && <PcLinkSection s={s} />}
+            {section === 'sudo' && <SudoSection s={s} />}
+            {section === 'appearance' && (
+              <>
+                <Row label={t.settings.theme} hint={t.settings.hints.theme}>
+                  <div className="flex gap-2" role="radiogroup" aria-label={t.settings.theme}>
+                    <ThemeCard
+                      id="system"
+                      label={t.settings.themeSystem}
+                      active={s.appearance.theme === 'system'}
+                    />
+                    <ThemeCard
+                      id="dark"
+                      label={t.settings.themeDark}
+                      active={s.appearance.theme === 'dark'}
+                    />
+                    <ThemeCard
+                      id="light"
+                      label={t.settings.themeLight}
+                      active={s.appearance.theme === 'light'}
+                    />
+                  </div>
+                </Row>
+                <Row label={t.settings.uiFont} hint={t.settings.hints.uiFont}>
+                  <Num
+                    value={s.appearance.uiFontSize}
+                    min={12}
+                    max={15}
+                    onCommit={(v) => void patch({ appearance: { uiFontSize: v } })}
                   />
-                  <ThemeCard id="dark" label={t.settings.themeDark} active={s.appearance.theme === 'dark'} />
-                  <ThemeCard
-                    id="light"
-                    label={t.settings.themeLight}
-                    active={s.appearance.theme === 'light'}
-                  />
-                </div>
-              </Row>
-              <Row label={t.settings.uiFont}>
-                <Num
-                  value={s.appearance.uiFontSize}
-                  min={12}
-                  max={15}
-                  onCommit={(v) => void patch({ appearance: { uiFontSize: v } })}
-                />
-              </Row>
-              <Row label={t.settings.density}>
-                <Choice
-                  value={s.appearance.density}
-                  options={[
-                    { v: 'compact', label: t.settings.compact },
-                    { v: 'normal', label: t.settings.normal },
-                  ]}
-                  onChange={(v) => void patch({ appearance: { density: v } })}
-                />
-              </Row>
-            </>
-          )}
-          {section === 'terminal' && (
-            <>
-              <Row label={t.settings.font}>
-                <select
-                  className={inputCls}
-                  value={s.terminal.fontFamily}
-                  onChange={(e) => void patch({ terminal: { fontFamily: e.target.value } })}
-                >
-                  {[
-                    'JetBrains Mono',
-                    'Cascadia Mono',
-                    'Consolas',
-                    ...(['JetBrains Mono', 'Cascadia Mono', 'Consolas'].includes(s.terminal.fontFamily)
-                      ? []
-                      : [s.terminal.fontFamily]),
-                  ].map((f) => (
-                    <option key={f}>{f}</option>
-                  ))}
-                </select>
-              </Row>
-              <Row label={t.settings.fontSize}>
-                <Num
-                  value={s.terminal.fontSize}
-                  min={11}
-                  max={20}
-                  onCommit={(v) => void patch({ terminal: { fontSize: v } })}
-                />
-              </Row>
-              <Row label={t.settings.lineHeight}>
-                <Num
-                  value={s.terminal.lineHeight}
-                  min={1}
-                  max={1.4}
-                  step={0.05}
-                  onCommit={(v) => void patch({ terminal: { lineHeight: v } })}
-                />
-              </Row>
-              <Row label={t.settings.cursor}>
-                <div className="flex items-center gap-3">
+                </Row>
+                <Row label={t.settings.density} hint={t.settings.hints.density}>
                   <Choice
-                    value={s.terminal.cursorStyle}
+                    value={s.appearance.density}
                     options={[
-                      { v: 'block', label: t.settings.cursorBlock },
-                      { v: 'bar', label: t.settings.cursorBar },
+                      { v: 'compact', label: t.settings.compact },
+                      { v: 'normal', label: t.settings.normal },
                     ]}
-                    onChange={(v) => void patch({ terminal: { cursorStyle: v } })}
+                    onChange={(v) => void patch({ appearance: { density: v } })}
                   />
-                  <span className="flex items-center gap-1 text-[12px] text-muted">
-                    <Toggle
-                      checked={s.terminal.cursorBlink}
-                      onChange={(v) => void patch({ terminal: { cursorBlink: v } })}
-                    />{' '}
-                    {t.settings.cursorBlink}
-                  </span>
-                </div>
-              </Row>
-              <Row label={t.settings.renderer} hint={t.settings.rendererHint}>
-                <Choice
-                  value={s.terminal.renderer}
-                  options={[
-                    { v: 'dom', label: t.settings.rendererDom },
-                    { v: 'webgl', label: t.settings.rendererWebgl },
-                  ]}
-                  onChange={(v) => void patch({ terminal: { renderer: v } })}
-                />
-              </Row>
-              <Row label={t.settings.hideTmuxStatus} hint={t.settings.hideTmuxStatusHint}>
-                <Toggle
-                  checked={s.terminal.hideTmuxStatus}
-                  onChange={(v) => void patch({ terminal: { hideTmuxStatus: v } })}
-                />
-              </Row>
-              <Row label={t.settings.scrollback}>
-                <Num
-                  value={s.terminal.scrollback}
-                  min={500}
-                  max={100000}
-                  step={500}
-                  onCommit={(v) => void patch({ terminal: { scrollback: v } })}
-                />
-              </Row>
-              <Row label={t.settings.ctrlC}>
-                <Toggle
-                  checked={s.terminal.ctrlCCopies}
-                  onChange={(v) => void patch({ terminal: { ctrlCCopies: v } })}
-                />
-              </Row>
-              <Row label={t.settings.ctrlV}>
-                <Toggle
-                  checked={s.terminal.ctrlVPastes}
-                  onChange={(v) => void patch({ terminal: { ctrlVPastes: v } })}
-                />
-              </Row>
-              <Row label={t.settings.warnPaste}>
-                <Toggle
-                  checked={s.terminal.warnMultilinePaste}
-                  onChange={(v) => void patch({ terminal: { warnMultilinePaste: v } })}
-                />
-              </Row>
-              <div className="mt-3 text-[12px] leading-snug text-muted">{t.settings.themeHint}</div>
-            </>
-          )}
-          {section === 'notifications' && <NotificationsSection s={s} />}
-          {section === 'startup' && (
-            <>
-              <Row label={t.settings.restoreTabs}>
-                <Toggle
-                  checked={s.startup.restoreTabs}
-                  onChange={(v) => void patch({ startup: { restoreTabs: v } })}
-                />
-              </Row>
-              <StartupTray s={s} />
-            </>
-          )}
-          {section === 'integrations' && (
-            <>
-              <Row label={t.settings.rdpScript} hint={t.settings.rdpScriptHint}>
-                <Text
-                  value={s.integrations.rdpScript}
-                  placeholder={t.settings.rdpScriptPh}
-                  onCommit={(v) => void patch({ integrations: { rdpScript: v } })}
-                />
-              </Row>
-              <Row label={t.settings.vscodeCmd}>
-                <Text
-                  value={s.integrations.vscodeCommand}
-                  onCommit={(v) => void patch({ integrations: { vscodeCommand: v } })}
-                />
-              </Row>
-              <Row label={t.settings.remoteHost} hint={t.settings.remoteHostHint}>
-                <Text
-                  value={s.integrations.remoteHost}
-                  placeholder={s.connection.host}
-                  onCommit={(v) => void patch({ integrations: { remoteHost: v } })}
-                />
-              </Row>
-            </>
-          )}
-          {section === 'about' && <AboutSection s={s} />}
+                </Row>
+              </>
+            )}
+            {section === 'terminal' && (
+              <>
+                <Row label={t.settings.font} hint={t.settings.hints.font}>
+                  <select
+                    className={inputCls}
+                    value={s.terminal.fontFamily}
+                    onChange={(e) => void patch({ terminal: { fontFamily: e.target.value } })}
+                  >
+                    {[
+                      'JetBrains Mono',
+                      'Cascadia Mono',
+                      'Consolas',
+                      ...(['JetBrains Mono', 'Cascadia Mono', 'Consolas'].includes(s.terminal.fontFamily)
+                        ? []
+                        : [s.terminal.fontFamily]),
+                    ].map((f) => (
+                      <option key={f}>{f}</option>
+                    ))}
+                  </select>
+                </Row>
+                <Row label={t.settings.fontSize} hint={t.settings.hints.fontSize}>
+                  <Num
+                    value={s.terminal.fontSize}
+                    min={11}
+                    max={20}
+                    onCommit={(v) => void patch({ terminal: { fontSize: v } })}
+                  />
+                </Row>
+                <Row label={t.settings.lineHeight} hint={t.settings.hints.lineHeight}>
+                  <Num
+                    value={s.terminal.lineHeight}
+                    min={1}
+                    max={1.4}
+                    step={0.05}
+                    onCommit={(v) => void patch({ terminal: { lineHeight: v } })}
+                  />
+                </Row>
+                <Row label={t.settings.cursor}>
+                  <div className="flex items-center gap-3">
+                    <Choice
+                      value={s.terminal.cursorStyle}
+                      options={[
+                        { v: 'block', label: t.settings.cursorBlock },
+                        { v: 'bar', label: t.settings.cursorBar },
+                      ]}
+                      onChange={(v) => void patch({ terminal: { cursorStyle: v } })}
+                    />
+                    <span className="flex items-center gap-1 text-[12px] text-muted">
+                      <Toggle
+                        checked={s.terminal.cursorBlink}
+                        onChange={(v) => void patch({ terminal: { cursorBlink: v } })}
+                      />{' '}
+                      {t.settings.cursorBlink}
+                    </span>
+                  </div>
+                </Row>
+                <Row label={t.settings.renderer} hint={t.settings.hints.renderer}>
+                  <Choice
+                    value={s.terminal.renderer}
+                    options={[
+                      { v: 'dom', label: t.settings.rendererDom },
+                      { v: 'webgl', label: t.settings.rendererWebgl },
+                    ]}
+                    onChange={(v) => void patch({ terminal: { renderer: v } })}
+                  />
+                </Row>
+                <Row label={t.settings.hideTmuxStatus} hint={t.settings.hideTmuxStatusHint}>
+                  <Toggle
+                    checked={s.terminal.hideTmuxStatus}
+                    onChange={(v) => void patch({ terminal: { hideTmuxStatus: v } })}
+                  />
+                </Row>
+                <Row label={t.settings.scrollback} hint={t.settings.hints.scrollback}>
+                  <Num
+                    value={s.terminal.scrollback}
+                    min={500}
+                    max={100000}
+                    step={500}
+                    onCommit={(v) => void patch({ terminal: { scrollback: v } })}
+                  />
+                </Row>
+                <Row label={t.settings.ctrlC} hint={t.settings.hints.ctrlC}>
+                  <Toggle
+                    checked={s.terminal.ctrlCCopies}
+                    onChange={(v) => void patch({ terminal: { ctrlCCopies: v } })}
+                  />
+                </Row>
+                <Row label={t.settings.ctrlV} hint={t.settings.hints.ctrlV}>
+                  <Toggle
+                    checked={s.terminal.ctrlVPastes}
+                    onChange={(v) => void patch({ terminal: { ctrlVPastes: v } })}
+                  />
+                </Row>
+                <Row label={t.settings.warnPaste} hint={t.settings.hints.warnPaste}>
+                  <Toggle
+                    checked={s.terminal.warnMultilinePaste}
+                    onChange={(v) => void patch({ terminal: { warnMultilinePaste: v } })}
+                  />
+                </Row>
+              </>
+            )}
+            {section === 'notifications' && <NotificationsSection s={s} />}
+            {section === 'startup' && (
+              <>
+                <Row label={t.settings.restoreTabs} hint={t.settings.hints.restoreTabs}>
+                  <Toggle
+                    checked={s.startup.restoreTabs}
+                    onChange={(v) => void patch({ startup: { restoreTabs: v } })}
+                  />
+                </Row>
+                <StartupTray s={s} />
+              </>
+            )}
+            {section === 'integrations' && (
+              <>
+                <Row label={t.settings.rdpScript} hint={t.settings.rdpScriptHint}>
+                  <Text
+                    value={s.integrations.rdpScript}
+                    placeholder={t.settings.rdpScriptPh}
+                    onCommit={(v) => void patch({ integrations: { rdpScript: v } })}
+                  />
+                </Row>
+                <Row label={t.settings.vscodeCmd} hint={t.settings.hints.vscodeCmd}>
+                  <Text
+                    value={s.integrations.vscodeCommand}
+                    onCommit={(v) => void patch({ integrations: { vscodeCommand: v } })}
+                  />
+                </Row>
+                <Row label={t.settings.remoteHost} hint={t.settings.remoteHostHint}>
+                  <Text
+                    value={s.integrations.remoteHost}
+                    placeholder={s.connection.host}
+                    onCommit={(v) => void patch({ integrations: { remoteHost: v } })}
+                  />
+                </Row>
+              </>
+            )}
+            {section === 'about' && <AboutSection s={s} />}
+          </div>
         </div>
-      </div>
+      </Tooltip.Provider>
     </Modal>
   );
 }

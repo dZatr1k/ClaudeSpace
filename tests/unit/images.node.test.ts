@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -27,15 +27,17 @@ describe('uploadImage', () => {
     const home = mkdtempSync(join(tmpdir(), 'cs-img-'));
     homes.push(home);
     const t = new LocalTransport('/nonexistent', '/bin/bash', home);
-    const r = await uploadImage(t, PNG, new Date(2026, 10, 14, 9, 5, 7));
+    const r = await uploadImage(t, PNG);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.path).toMatch(
-      new RegExp(`^${home}/\\.cache/claudespace/images/20261114-090507-[0-9a-f]{6}\\.png$`),
-    );
+    expect(r.path).toMatch(new RegExp(`^${home}/\\.cache/claudespace/images/img-[0-9a-f]{16}\\.png$`));
     expect(readFileSync(r.path)).toEqual(Buffer.from(PNG));
     expect(statSync(r.path).mode & 0o777).toBe(0o600);
     expect(statSync(join(home, '.cache/claudespace/images')).mode & 0o777).toBe(0o700);
+    // the same picture again: the same file, not a second copy
+    const again = await uploadImage(t, PNG);
+    expect(again).toEqual(r);
+    expect(readdirSync(join(home, '.cache/claudespace/images'))).toHaveLength(1);
     t.close();
   });
 

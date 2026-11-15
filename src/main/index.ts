@@ -322,6 +322,15 @@ const handlers: Handlers = {
   'clipboard.write': ({ text }) => clipboard.writeText(text),
   'diag.log': ({ text }) => log('[diag]', text),
   'sound.load': () => loadSound(store.settings.notifications.soundFile),
+  'sound.pick': async () => {
+    const opts = {
+      title: 'Звук уведомления',
+      properties: ['openFile' as const],
+      filters: [{ name: 'Звук', extensions: ['wav', 'mp3', 'ogg'] }],
+    };
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+  },
   'notify.show': (a) => showSystemNotification(a),
   'clipboard.read': () => clipboard.readText(),
   'image.pasteClipboard': async () => {

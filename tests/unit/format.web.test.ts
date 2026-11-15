@@ -48,3 +48,18 @@ describe('formatAgo', () => {
     expect(fuzzyScore('xq', 'MyGame')).toBe(0);
   });
 });
+
+describe('axisTokens', () => {
+  it('keeps chart axis labels short', async () => {
+    const { axisTokens } = await import('../../src/renderer/lib/format');
+    expect([0, 500, 2500, 2.5e6, 100e6, 300e6, 1.2e9].map(axisTokens)).toEqual([
+      '0',
+      '500',
+      '2.5K',
+      '2.5M',
+      '100M',
+      '300M',
+      '1.2B',
+    ]);
+  });
+});

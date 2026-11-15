@@ -91,6 +91,15 @@ export function formatTokens(n: number | null | undefined): string {
   return String(v);
 }
 
+/** axis labels: short, no trailing .0 (300M, 2.5M, 1.2B) so they fit left of the plot */
+export function axisTokens(v: number): string {
+  const f = (n: number, unit: string) => `${Number(n.toFixed(1))}${unit}`;
+  if (v >= 1e9) return f(v / 1e9, 'B');
+  if (v >= 1e6) return f(v / 1e6, 'M');
+  if (v >= 1e3) return f(v / 1e3, 'K');
+  return String(v);
+}
+
 export function formatLeft(min: number | null | undefined): string {
   if (min == null) return '';
   return `${Math.floor(min / 60)}ч${String(min % 60).padStart(2, '0')}м`;

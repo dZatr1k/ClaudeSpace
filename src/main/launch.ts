@@ -147,7 +147,11 @@ export function loadSound(
   configured: string,
   home = homedir(),
 ): { ok: boolean; path: string; data?: Uint8Array; error?: string } {
-  const path = configured.trim() || defaultSoundPath(home);
+  // %USERPROFILE% and other Windows variables, as in the hint and in paths copied from Explorer
+  const path = (configured.trim() || defaultSoundPath(home)).replace(
+    /%([A-Za-z_][A-Za-z0-9_]*)%/g,
+    (m, name: string) => (name.toUpperCase() === 'USERPROFILE' ? home : (process.env[name] ?? m)),
+  );
   if (!SOUND_EXT.test(path)) return { ok: false, path, error: 'нужен .wav, .mp3 или .ogg' };
   try {
     const st = statSync(path);

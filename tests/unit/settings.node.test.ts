@@ -206,6 +206,9 @@ describe('notification sound file', () => {
       const r = loadSound('', home);
       expect(r.ok).toBe(true);
       expect(r.data?.length).toBe(12);
+      // %USERPROFILE% (as shown in the hint) points at the same file
+      const sep = process.platform === 'win32' ? '\\' : '/';
+      expect(loadSound(['%USERPROFILE%', '.claude', 'sounds', 'sound.wav'].join(sep), home).ok).toBe(true);
       expect(loadSound(join(home, 'x.exe'), home)).toMatchObject({
         ok: false,
         error: 'нужен .wav, .mp3 или .ogg',

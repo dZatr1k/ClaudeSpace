@@ -400,6 +400,19 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await win.getByRole('button', { name: /^Настройки \(/ }).click();
   await win.getByRole('button', { name: 'Внешний вид' }).click();
   await win.screenshot({ path: join(SHOTS, '07-settings.png') });
+  // hints are hidden until the pointer rests on a setting's name, then shown as a tooltip
+  const settingsBox = win.locator('[data-settings]');
+  await win.getByRole('button', { name: 'Терминал' }).click();
+  await expect(win.getByRole('tooltip')).toHaveCount(0);
+  await settingsBox.getByText('Отрисовка', { exact: true }).hover();
+  await expect(win.getByRole('tooltip')).toContainText('WebGL рисует на видеокарте', { timeout: 3000 });
+  await win.screenshot({ path: join(SHOTS, '27-settings-hint.png') });
+  await win.mouse.move(5, 5);
+  await win.getByRole('button', { name: 'Уведомления' }).click();
+  await expect(settingsBox.getByRole('button', { name: 'Обзор…' })).toBeVisible();
+  await win.screenshot({ path: join(SHOTS, '28-settings-notify.png') });
+  await win.getByRole('button', { name: 'ПК ↔ VM' }).click();
+  await win.screenshot({ path: join(SHOTS, '29-settings-pclink.png') });
   await win.keyboard.press('Escape');
 
   // sudo prompt from the VM (BACKLOG 11): the installed askpass.py, run like sudo does -> modal -> its stdout

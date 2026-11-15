@@ -51,7 +51,7 @@ test('WebGL glyphs are drawn at full size and the terminal keeps WebGL', async (
     const log = (re: RegExp) => () => readFileSync(join(ud, 'logs', 'main.log'), 'utf8').match(re)?.[1] ?? '';
     await expect.poll(log(/\[webgl-probe\] (.*)/), { timeout: 20_000 }).toMatch(/"ok":true,"ratio":(0\.9|1)/);
     await expect.poll(log(/\[webgl-live\] (.*)/), { timeout: 30_000 }).toMatch(/"ok":true,"ratio":(0\.9|1)/);
-    console.log('webgl-live', log(/\[webgl-live\] (.*)/)());
+    console.warn('webgl-live', log(/\[webgl-live\] (.*)/)());
     await expect(win.locator('.xterm-screen canvas').first()).toBeVisible();
     await win.screenshot({ path: join(ROOT, 'test-results', 'webgl.png') });
   } finally {

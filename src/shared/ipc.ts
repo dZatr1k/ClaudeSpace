@@ -61,6 +61,7 @@ export const ipcSchemas = {
   'clipboard.write': z.object({ text: z.string().max(1024 * 1024) }).strict(),
   'diag.log': z.object({ text: z.string().max(8000) }).strict(),
   'sound.load': z.undefined(),
+  'sound.pick': z.undefined(),
   'notify.show': z
     .object({
       title: z.string().max(200),
@@ -169,6 +170,8 @@ export interface IpcContract {
   'clipboard.write': { args: { text: string }; result: void };
   'diag.log': { args: { text: string }; result: void };
   'sound.load': { args: undefined; result: { ok: boolean; path: string; data?: Uint8Array; error?: string } };
+  /** file picker for the notification sound: the chosen path, or null if cancelled */
+  'sound.pick': { args: undefined; result: string | null };
   'notify.show': {
     args: { title: string; body: string; session: string; chatId?: string };
     result: { ok: boolean };

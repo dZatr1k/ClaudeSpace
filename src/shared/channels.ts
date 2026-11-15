@@ -23,6 +23,7 @@ export const IPC_CHANNEL_NAMES = [
   'clipboard.write',
   'diag.log',
   'sound.load',
+  'sound.pick',
   'notify.show',
   'clipboard.read',
   'image.pasteClipboard',

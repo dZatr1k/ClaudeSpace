@@ -2,11 +2,11 @@
 // project and model. One measure (tokens), one hue; values in text tokens, the bar only carries magnitude.
 // Data: agent usage_report (ccusage daily --breakdown, session, blocks; cached 2 min).
 import { RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { UsageDay, UsageReport as Report } from '@shared/protocol';
 import { agent } from '../../bridge';
 import { t } from '../../i18n/ru';
-import { formatModel, formatTokens } from '../../lib/format';
+import { axisTokens, formatModel, formatTokens } from '../../lib/format';
 import { useConn } from '../../stores/conn';
 import { Button } from '../ui/Button';
 
@@ -100,7 +100,7 @@ function DailyChart({ daily }: { daily: UsageDay[] }) {
   const [hover, setHover] = useState<number | null>(null);
   const W = 640;
   const H = 180;
-  const padL = 44;
+  const padL = 48;
   const padB = 22;
   const padT = 8;
   const max = Math.max(...daily.map((d) => d.tokens), 1);
@@ -133,7 +133,7 @@ function DailyChart({ daily }: { daily: UsageDay[] }) {
               fill="var(--text-faint)"
               className="tnum"
             >
-              {formatTokens(v)}
+              {axisTokens(v)}
             </text>
           </g>
         ))}
@@ -256,15 +256,21 @@ export function UsageReportPane() {
   const [r, setR] = useState<Report | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // only the latest request may set the report: switching 30 -> 7 days quickly must not let the slower 30-day
+  // answer arrive last and replace the 7-day chart
+  const seq = useRef(0);
   const load = useCallback(async (days: Period, maxAge: number) => {
+    const my = ++seq.current;
     setBusy(true);
     try {
-      setR(await agent('usage_report', { days, maxAge }));
+      const res = await agent('usage_report', { days, maxAge });
+      if (my !== seq.current) return;
+      setR(res);
       setErr(null);
     } catch (e) {
-      setErr((e as Error).message);
+      if (my === seq.current) setErr((e as Error).message);
     } finally {
-      setBusy(false);
+      if (my === seq.current) setBusy(false);
     }
   }, []);
   useEffect(() => {

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+- Settings: every setting explains itself in a hint that shows when the pointer rests on its name (or the «?»
+  next to it), or on keyboard focus. States and warnings stay visible. Rewritten hints, shorter labels, fixed
+  layouts of the Connection and PC ↔ VM tabs, an outdated note about Claude Code colours removed.
+- Notification sound: a «Обзор…» button to pick the file, «По умолчанию» to clear it; %USERPROFILE% in the path
+  now works.
+- Usage chart: axis labels fit (300M instead of a clipped 300.0M), and switching periods quickly no longer leaves
+  the chart of the previous period on screen.
+- Images: the same picture pasted twice is uploaded to the VM once (files are named by content).
+
 ## 0.7.3
 - The tmux status line (session name, clock, host) is hidden in the app's terminals: tmux gets one more row than
   the window shows and that row is cut off, so SSH and phone clients keep their status line. Settings →
