@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.3
 - The tmux status line (session name, clock, host) is hidden in the app's terminals: tmux gets one more row than
   the window shows and that row is cut off, so SSH and phone clients keep their status line. Settings →
   Terminal → «Прятать строку tmux» turns it back on.
