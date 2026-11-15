@@ -114,6 +114,8 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await expect(win.getByTestId('project-Alpha')).toBeVisible({ timeout: 30_000 });
   await expect(win.locator('[data-conn="online"]').first()).toBeVisible();
   await expect(win.getByTestId('start-screen')).toBeVisible();
+  // the splash lingers ~0.65 s after going online ("Готово" + fade); the first screenshot must not catch it
+  await expect(win.getByTestId('splash')).toHaveCount(0);
   const fontsOk = await win.evaluate(async () => {
     await document.fonts.load('13px Inter', 'Привет');
     await document.fonts.load('14px "JetBrains Mono"', 'Привет');
@@ -321,17 +323,62 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
       },
     }),
   );
+  // memory of two projects, a user skill, a plugin with a skill and a hook, a user hook: grouped by whose they are
+  const claudeDir = join(fh.home, '.claude');
+  const put = (dir: string, name: string, body: string) => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, name), body);
+  };
+  for (const [proj, slug] of [
+    [fh.alpha, 'alpha-build'],
+    [fh.beta, 'beta-deploy'],
+  ] as const) {
+    const mem = join(claudeDir, 'projects', proj.replace(/[^A-Za-z0-9]/g, '-'), 'memory');
+    put(mem, 'MEMORY.md', `- [${slug}](${slug}.md)\n`);
+    put(mem, `${slug}.md`, `---\nname: ${slug}\ndescription: Заметка проекта\n---\n\nТекст.\n`);
+  }
+  put(
+    join(claudeDir, 'skills', 'review'),
+    'SKILL.md',
+    '---\nname: review\ndescription: Проверка правок\n---\n',
+  );
+  const plug = join(claudeDir, 'plugins', 'cache', 'demo-market', 'demo', '1.0.0');
+  put(
+    join(plug, 'skills', 'demo-skill'),
+    'SKILL.md',
+    '---\nname: demo-skill\ndescription: Скилл плагина\n---\n',
+  );
+  put(
+    join(plug, 'hooks'),
+    'hooks.json',
+    JSON.stringify({
+      hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'check.sh' }] }] },
+    }),
+  );
+  put(
+    join(claudeDir, 'plugins'),
+    'installed_plugins.json',
+    JSON.stringify({
+      version: 2,
+      plugins: { 'demo@demo-market': [{ scope: 'user', installPath: plug, version: '1.0.0' }] },
+    }),
+  );
+  put(
+    claudeDir,
+    'settings.json',
+    JSON.stringify({
+      enabledPlugins: { 'demo@demo-market': true },
+      hooks: { Stop: [{ hooks: [{ type: 'command', command: '~/.claude/hooks/notify.sh' }] }] },
+    }),
+  );
   await win.getByRole('button', { name: /^Настройки Claude/ }).click();
   const cs = win.locator('[data-claude-screen]');
-  await expect(
-    cs.getByRole('button', { name: /Папка выше: CLAUDE.md|Проект: CLAUDE.md/ }).first(),
-  ).toBeVisible({
+  const alphaDocs = cs.locator('[data-group^="instructions:"][data-group$="/projects/Alpha"]');
+  await expect(alphaDocs.getByRole('button', { name: /^Alpha.*текущий проект/ })).toBeVisible({
     timeout: 10_000,
   });
-  await cs
-    .getByRole('button', { name: /CLAUDE.md.*home\/projects\/Alpha\/CLAUDE.md/ })
-    .first()
-    .click();
+  await expect(cs.locator('[data-group="instructions:user"]')).toContainText('Для всех проектов');
+  await alphaDocs.getByRole('button', { name: /^CLAUDE\.md/ }).click();
   const editor = cs.getByRole('textbox');
   await expect(editor).toHaveValue(/# Alpha/);
   await editor.press('End');
@@ -341,8 +388,39 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await expect(cs).toContainText('сохранено', { timeout: 5000 });
   expect(readFileSync(join(fh.alpha, 'CLAUDE.md'), 'utf8')).toContain('Пиши тесты.');
   await win.screenshot({ path: join(SHOTS, '19-claude-instructions.png') });
+  // memory: the current project's group is open, other projects' groups are closed until clicked
+  await cs.getByRole('button', { name: /^Память/ }).click();
+  const alphaMem = cs.locator('[data-group*="-projects-Alpha/memory"]');
+  const betaMem = cs.locator('[data-group*="-projects-Beta/memory"]');
+  await expect(alphaMem.getByRole('button', { name: /^alpha-build/ })).toBeVisible();
+  const betaHead = betaMem.getByRole('button', { name: /^Beta/ });
+  await expect(betaHead).toHaveAttribute('aria-expanded', 'false');
+  await expect(betaMem.getByRole('button', { name: /^beta-deploy/ })).toBeHidden();
+  await betaHead.click();
+  await expect(betaHead).toHaveAttribute('aria-expanded', 'true');
+  await betaMem.getByRole('button', { name: /^beta-deploy/ }).click();
+  await expect(editor).toHaveValue(/name: beta-deploy/);
+  await win.screenshot({ path: join(SHOTS, '30-claude-memory.png') });
+  await setTheme(win, 'light');
+  await win.screenshot({ path: join(SHOTS, '31-claude-memory-light.png') });
+  await setTheme(win, 'dark');
+  // the open/closed state survives switching sections
+  await cs.getByRole('button', { name: /^Скиллы/ }).click();
+  await expect(cs.locator('[data-group="skills:user:"]')).toContainText('review');
+  await expect(cs.locator('[data-group="skills:plugin:demo"]')).toContainText('Плагин demo');
+  await cs.getByRole('button', { name: /^Память/ }).click();
+  await expect(betaHead).toHaveAttribute('aria-expanded', 'true');
+  // a plugin lists what it brings: its skills and hooks
+  await cs.getByRole('button', { name: /^Плагины/ }).click();
+  const demo = cs.locator('[data-group="plugins:demo@demo-market"]');
+  await expect(demo).toContainText('demo-skill');
+  await expect(demo).toContainText('PreToolUse');
+  await win.screenshot({ path: join(SHOTS, '32-claude-plugins.png') });
+  await cs.getByRole('button', { name: /^Хуки/ }).click();
+  await expect(cs.locator('[data-group="hooks:user:"]')).toContainText('notify.sh');
+  await expect(cs.locator('[data-group="hooks:plugin:demo"]')).toContainText('check.sh');
   await cs.getByRole('button', { name: /MCP-серверы/ }).click();
-  await expect(cs).toContainText('npx @playwright/mcp');
+  await expect(cs.locator('[data-group="mcp:user"]')).toContainText('npx @playwright/mcp');
   await expect(cs).not.toContainText('sk-e2e-secret');
   await win.screenshot({ path: join(SHOTS, '20-claude-mcp.png') });
   await win.keyboard.press('Escape');

@@ -62,6 +62,8 @@ interface UiStore {
   system: SystemSection | null;
   /** the «Claude» screen: section and the folder project-level files are looked up from (null = user only) */
   claudeScreen: { section: ClaudeSection; folder: string | null } | null;
+  /** groups on the «Claude» screen the user opened or closed, by `${section}:${key}`; unset = the group's default */
+  claudeGroups: Record<string, boolean>;
   settingsOpen: SettingsSection | null;
   dialog: Dialog | null;
   viewer: Viewer | null;
@@ -100,6 +102,7 @@ export const useUi = create<UiStore>((set) => ({
   chatSearch: null,
   system: null,
   claudeScreen: null,
+  claudeGroups: {},
   settingsOpen: null,
   dialog: null,
   viewer: null,

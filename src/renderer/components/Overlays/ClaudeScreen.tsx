@@ -2,9 +2,9 @@
 // MCP servers, skills, plugins and hooks are shown read-only with the command that changes them. The agent builds the
 // overview (MCP keys never leave it) and writes only CLAUDE.md and memory notes, refusing if the file changed since it
 // was loaded (cclib/claudecfg.py).
-import { RotateCw, Save } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ClaudeConfig, ClaudeDoc, ClaudeMemoryFile } from '@shared/protocol';
+import { ChevronRight, RotateCw, Save } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import type { ClaudeConfig, ClaudeDoc, ClaudeHook, ClaudeMemoryFile } from '@shared/protocol';
 import { openVsCode } from '../../actions';
 import { agent, invoke } from '../../bridge';
 import { t } from '../../i18n/ru';
@@ -201,12 +201,12 @@ function Item({
   );
 }
 
-function Heading({ children }: { children: React.ReactNode }) {
-  return <h3 className="mb-1 mt-3 px-2.5 text-[12px] font-semibold text-muted first:mt-0">{children}</h3>;
-}
-
 function Hint({ children }: { children: React.ReactNode }) {
   return <p className="mt-4 text-[12px] leading-relaxed text-faint">{children}</p>;
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="px-2.5 py-1.5 text-[12px] text-muted">{children}</p>;
 }
 
 function Badge({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'off' | 'on' }) {
@@ -223,20 +223,118 @@ function Badge({ children, tone = 'muted' }: { children: React.ReactNode; tone?:
   );
 }
 
-const scopeLabel = (s: string) => (T().scopes as Record<string, string>)[s] ?? s;
+/** a settings file a group comes from, as a machine value */
+function PathNote({ path }: { path: string }) {
+  return <span className="mono min-w-0 truncate text-[12px] text-faint">{homeShort(path)}</span>;
+}
 
-function docTitle(d: ClaudeDoc): string {
-  const name = d.path.split('/').pop() ?? d.path;
-  return d.scope === 'user' ? T().userDoc : `${scopeLabel(d.scope)}: ${name}`;
+const baseName = (p: string) => p.replace(/\/+$/, '').split('/').pop() || p;
+
+/** the project that project-level files belong to: the git root, else the chat's folder */
+function projectName(cfg: ClaudeConfig): string {
+  const r = cfg.root ?? cfg.folder;
+  return r ? baseName(homeShort(r)) : '';
+}
+
+/** whose a skill, hook or MCP server is, as a group heading; `repo` = the project scope of MCP (.mcp.json) */
+function ownerLabel(
+  cfg: ClaudeConfig,
+  o: { scope: 'user' | 'project' | 'local' | 'plugin'; plugin?: string | null },
+  repo = false,
+): string {
+  const O = T().owner;
+  if (o.scope === 'user') return O.user;
+  if (o.scope === 'plugin') return T().fromPlugin(o.plugin ?? '');
+  if (o.scope === 'local') return O.local(projectName(cfg));
+  return repo ? O.repo(projectName(cfg)) : O.project(projectName(cfg));
+}
+
+function groupBy<V>(items: V[], key: (x: V) => string): { key: string; items: V[]; first: V }[] {
+  const out = new Map<string, { key: string; items: V[]; first: V }>();
+  for (const x of items) {
+    const k = key(x);
+    const g = out.get(k);
+    if (g) g.items.push(x);
+    else out.set(k, { key: k, items: [x], first: x });
+  }
+  return [...out.values()];
+}
+
+/** A collapsible group: what the rows under it belong to (a project, a plugin, a settings file). The guide line on
+ * the left shows where the group ends. What the user opened or closed is kept while the app runs; until then the
+ * group follows `defaultOpen`. */
+function Group({
+  id,
+  label,
+  note,
+  title,
+  count,
+  defaultOpen = true,
+  children,
+}: {
+  id: string;
+  label: string;
+  note?: React.ReactNode;
+  title?: string;
+  count: number | null;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const stored = useUi((u) => u.claudeGroups[id]);
+  const open = stored ?? defaultOpen;
+  const bodyId = useId();
+  const toggle = () => {
+    const ui = useUi.getState();
+    ui.set({ claudeGroups: { ...ui.claudeGroups, [id]: !open } });
+  };
+  return (
+    <section className="mt-2 first:mt-0" data-group={id}>
+      <h3>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          title={title}
+          className="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-[4px] px-1.5 text-left transition-colors duration-100 hover:bg-hover active:bg-selected"
+          onClick={toggle}
+        >
+          <ChevronRight
+            size={13}
+            aria-hidden
+            className={`shrink-0 text-faint motion-safe:transition-transform motion-safe:duration-100 ${open ? 'rotate-90' : ''}`}
+          />
+          <span className="min-w-0 shrink truncate text-[12px] font-semibold text-fg">{label}</span>
+          {typeof note === 'string' ? (
+            <span className="min-w-0 truncate text-[12px] text-faint">{note}</span>
+          ) : (
+            note
+          )}
+          <span className="flex-1" />
+          {count !== null && <span className="tnum shrink-0 text-[12px] text-faint">{count}</span>}
+        </button>
+      </h3>
+      <div id={bodyId} hidden={!open} className="ml-3 mt-0.5 border-l border-line pl-1.5">
+        {children}
+      </div>
+    </section>
+  );
 }
 
 function SplitView({ list, detail }: { list: React.ReactNode; detail: React.ReactNode }) {
   return (
     <div className="flex h-full min-h-0 gap-4">
-      <div className="w-60 shrink-0 overflow-auto border-r border-line pr-3">{list}</div>
+      <div className="w-64 shrink-0 overflow-auto border-r border-line pr-3">{list}</div>
       <div className="min-h-0 min-w-0 flex-1 overflow-auto">{detail}</div>
     </div>
   );
+}
+
+const USER_DOCS = 'user';
+
+/** the folder a CLAUDE.md belongs to (`.claude/CLAUDE.md` counts as its parent folder's) */
+function docFolder(d: ClaudeDoc): string {
+  const nested = '/.claude/CLAUDE.md';
+  return d.path.endsWith(nested) ? d.path.slice(0, -nested.length) : d.path.slice(0, d.path.lastIndexOf('/'));
 }
 
 function Instructions({
@@ -248,22 +346,44 @@ function Instructions({
   onDirty: (d: boolean) => void;
   reload: () => void;
 }) {
-  const [sel, setSel] = useState(0);
-  const d = cfg.instructions[Math.min(sel, cfg.instructions.length - 1)];
+  const [path, setPath] = useState<string | null>(cfg.instructions[0]?.path ?? null);
+  const d = cfg.instructions.find((x) => x.path === path) ?? cfg.instructions[0];
+  const groups = groupBy(cfg.instructions, (x) => (x.scope === 'user' ? USER_DOCS : docFolder(x)));
   return (
     <SplitView
       list={
         <>
-          {cfg.instructions.map((x, i) => (
-            <Item
-              key={x.path}
-              active={x === d}
-              onClick={() => setSel(i)}
-              title={docTitle(x)}
-              sub={x.exists ? `${homeShort(x.path)} · ${formatBytes(x.size)}` : T().missing}
-              dim={!x.exists}
-            />
-          ))}
+          {groups.map(({ key, items, first }) => {
+            const user = key === USER_DOCS;
+            return (
+              <Group
+                key={key}
+                id={`instructions:${key}`}
+                label={user ? T().owner.user : baseName(homeShort(key))}
+                note={user ? null : key === cfg.folder ? T().current : T().parentFolder}
+                title={homeShort(user ? first.path : key)}
+                // one to three rows, all in view: a count adds nothing, and "0" next to a missing file reads as a bug
+                count={null}
+              >
+                {items.map((x) => (
+                  <Item
+                    key={x.path}
+                    active={x === d}
+                    onClick={() => setPath(x.path)}
+                    title={user ? baseName(x.path) : x.path.slice(key.length + 1)}
+                    sub={
+                      x.exists
+                        ? [x.scope === 'local' ? T().localDoc : null, formatBytes(x.size)]
+                            .filter(Boolean)
+                            .join(' · ')
+                        : T().missing
+                    }
+                    dim={!x.exists}
+                  />
+                ))}
+              </Group>
+            );
+          })}
           <Hint>{cfg.folder ? T().instructionsHint(homeShort(cfg.folder)) : T().instructionsNoFolder}</Hint>
         </>
       }
@@ -274,17 +394,23 @@ function Instructions({
 
 function Memory({ cfg, onDirty }: { cfg: ClaudeConfig; onDirty: (d: boolean) => void }) {
   const all = cfg.memory.flatMap((g) => g.files);
-  const [path, setPath] = useState<string | null>(all[0]?.path ?? null);
+  const [first] = useState<string | null>(all[0]?.path ?? null);
+  const [path, setPath] = useState<string | null>(first);
   const f: ClaudeMemoryFile | undefined = all.find((x) => x.path === path);
   if (!all.length) return <p className="text-[13px] text-muted">{T().noMemory}</p>;
   return (
     <SplitView
       list={cfg.memory.map((g) => (
-        <section key={g.dir}>
-          <Heading>
-            {g.label}
-            {g.current ? ` · ${T().current}` : ''}
-          </Heading>
+        <Group
+          key={g.dir}
+          id={`memory:${g.dir}`}
+          label={g.label}
+          note={g.current ? T().current : null}
+          title={homeShort(g.folder ?? g.dir)}
+          count={g.files.length}
+          // other projects' notes stay closed: they don't apply to this chat
+          defaultOpen={g.current || g.files.some((x) => x.path === first)}
+        >
           {g.files.map((x) => (
             <Item
               key={x.path}
@@ -294,7 +420,7 @@ function Memory({ cfg, onDirty }: { cfg: ClaudeConfig; onDirty: (d: boolean) => 
               sub={x.description || (x.name === 'MEMORY.md' ? T().memoryIndex : formatAgo(x.mtime))}
             />
           ))}
-        </section>
+        </Group>
       ))}
       detail={
         f && (
@@ -313,19 +439,14 @@ function Memory({ cfg, onDirty }: { cfg: ClaudeConfig; onDirty: (d: boolean) => 
 function Skills({ cfg }: { cfg: ClaudeConfig }) {
   const [path, setPath] = useState<string | null>(cfg.skills[0]?.path ?? null);
   if (!cfg.skills.length) return <p className="text-[13px] text-muted">{T().noSkills}</p>;
-  const groups = new Map<string, typeof cfg.skills>();
-  for (const s of cfg.skills) {
-    const k = s.scope === 'plugin' ? T().fromPlugin(s.plugin ?? '') : scopeLabel(s.scope);
-    groups.set(k, [...(groups.get(k) ?? []), s]);
-  }
+  const groups = groupBy(cfg.skills, (s) => `${s.scope}:${s.plugin ?? ''}`);
   return (
     <SplitView
       list={
         <>
-          {[...groups].map(([k, list]) => (
-            <section key={k}>
-              <Heading>{k}</Heading>
-              {list.map((s) => (
+          {groups.map(({ key, items, first }) => (
+            <Group key={key} id={`skills:${key}`} label={ownerLabel(cfg, first)} count={items.length}>
+              {items.map((s) => (
                 <Item
                   key={s.path}
                   active={s.path === path}
@@ -334,7 +455,7 @@ function Skills({ cfg }: { cfg: ClaudeConfig }) {
                   sub={s.description}
                 />
               ))}
-            </section>
+            </Group>
           ))}
           <Hint>{T().skillsHint}</Hint>
         </>
@@ -350,25 +471,52 @@ function Mcp({ cfg }: { cfg: ClaudeConfig }) {
       {cfg.mcp.length === 0 ? (
         <p className="text-[13px] text-muted">{T().noMcp}</p>
       ) : (
-        <ul className="divide-y divide-line">
-          {cfg.mcp.map((m) => (
-            <li key={`${m.scope}:${m.name}`} className="flex items-center gap-3 py-2 text-[13px]">
-              <span className="w-48 shrink-0 truncate font-medium selectable">{m.name}</span>
-              <Badge>{scopeLabel(m.scope)}</Badge>
-              <Badge tone="off">{m.type}</Badge>
-              <span
-                className="mono min-w-0 flex-1 truncate text-[12px] text-muted selectable"
-                title={m.target}
-              >
-                {m.target}
-              </span>
-              {m.env > 0 && <span className="shrink-0 text-[12px] text-faint">{T().envCount(m.env)}</span>}
-            </li>
-          ))}
-        </ul>
+        groupBy(cfg.mcp, (m) => m.scope).map(({ key, items, first }) => (
+          <Group
+            key={key}
+            id={`mcp:${key}`}
+            label={ownerLabel(cfg, first, true)}
+            note={<PathNote path={first.source} />}
+            count={items.length}
+          >
+            <ul className="divide-y divide-line">
+              {items.map((m) => (
+                <li key={m.name} className="flex items-center gap-3 px-2.5 py-2 text-[13px]">
+                  <span className="w-48 shrink-0 truncate font-medium selectable">{m.name}</span>
+                  <Badge tone="off">{m.type}</Badge>
+                  <span
+                    className="mono min-w-0 flex-1 truncate text-[12px] text-muted selectable"
+                    title={m.target}
+                  >
+                    {m.target}
+                  </span>
+                  {m.env > 0 && (
+                    <span className="shrink-0 text-[12px] text-faint">{T().envCount(m.env)}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Group>
+        ))
       )}
       <Hint>{T().mcpHint}</Hint>
     </div>
+  );
+}
+
+function HookRow({ h }: { h: ClaudeHook }) {
+  return (
+    <li className="flex items-center gap-3 px-2.5 py-2 text-[12px]">
+      <span className="mono w-32 shrink-0 truncate text-muted" title={h.event}>
+        {h.event}
+      </span>
+      <span className="mono min-w-0 flex-1 truncate selectable" title={h.command}>
+        {h.command}
+      </span>
+      {h.matcher && <Badge tone="off">{h.matcher}</Badge>}
+      {h.async && <Badge tone="off">{T().async}</Badge>}
+      {h.timeout !== null && <span className="tnum shrink-0 text-faint">{T().timeout(h.timeout)}</span>}
+    </li>
   );
 }
 
@@ -378,18 +526,63 @@ function Plugins({ cfg }: { cfg: ClaudeConfig }) {
       {cfg.plugins.length === 0 ? (
         <p className="text-[13px] text-muted">{T().noPlugins}</p>
       ) : (
-        <ul className="divide-y divide-line">
-          {cfg.plugins.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 py-2 text-[13px]">
-              <span className={`w-48 shrink-0 truncate font-medium ${p.enabled ? '' : 'text-muted'}`}>
-                {p.name}
-              </span>
-              <Badge tone={p.enabled ? 'on' : 'off'}>{p.enabled ? T().on : T().off}</Badge>
-              <span className="mono text-[12px] text-muted">{p.version}</span>
-              <span className="min-w-0 flex-1 truncate text-[12px] text-faint">{p.marketplace}</span>
-            </li>
-          ))}
-        </ul>
+        cfg.plugins.map((p) => {
+          const mine = (x: { scope: string; plugin: string | null }) =>
+            x.scope === 'plugin' && x.plugin === p.name;
+          const skills = cfg.skills.filter(mine);
+          const hooks = cfg.hooks.filter(mine);
+          return (
+            <Group
+              key={p.id}
+              id={`plugins:${p.id}`}
+              label={p.name}
+              note={
+                <>
+                  <Badge tone={p.enabled ? 'on' : 'off'}>{p.enabled ? T().on : T().off}</Badge>
+                  <span className="mono shrink-0 text-[12px] text-muted">{p.version}</span>
+                  <span className="min-w-0 truncate text-[12px] text-faint">{p.marketplace}</span>
+                </>
+              }
+              // a disabled plugin is not read, so how many skills it has is unknown
+              count={p.enabled ? skills.length + hooks.length : null}
+              defaultOpen={p.enabled}
+            >
+              {!p.enabled ? (
+                <Empty>{T().pluginOff}</Empty>
+              ) : skills.length + hooks.length === 0 ? (
+                <Empty>{T().pluginEmpty}</Empty>
+              ) : (
+                <>
+                  {skills.length > 0 && (
+                    <>
+                      <h4 className="px-2.5 pb-0.5 pt-1.5 text-[12px] text-muted">{T().pluginSkills}</h4>
+                      <ul>
+                        {skills.map((s) => (
+                          <li key={s.path} className="px-2.5 py-1">
+                            <span className="block truncate text-[13px]">{s.name}</span>
+                            {s.description && (
+                              <span className="block truncate text-[12px] text-faint">{s.description}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {hooks.length > 0 && (
+                    <>
+                      <h4 className="px-2.5 pb-0.5 pt-1.5 text-[12px] text-muted">{T().pluginHooks}</h4>
+                      <ul className="divide-y divide-line">
+                        {hooks.map((h, i) => (
+                          <HookRow key={i} h={h} />
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </>
+              )}
+            </Group>
+          );
+        })
       )}
       <Hint>{T().pluginsHint}</Hint>
     </div>
@@ -397,32 +590,27 @@ function Plugins({ cfg }: { cfg: ClaudeConfig }) {
 }
 
 function Hooks({ cfg }: { cfg: ClaudeConfig }) {
-  const events = [...new Set(cfg.hooks.map((h) => h.event))];
   return (
     <div>
-      {events.length === 0 && <p className="text-[13px] text-muted">{T().noHooks}</p>}
-      {events.map((ev) => (
-        <section key={ev} className="mb-4">
-          <h3 className="mono mb-1 text-[12px] font-semibold text-muted">{ev}</h3>
-          <ul className="divide-y divide-line rounded-[6px] border border-line">
-            {cfg.hooks
-              .filter((h) => h.event === ev)
-              .map((h, i) => (
-                <li key={i} className="flex items-center gap-3 px-3 py-2 text-[12px]">
-                  <span className="mono min-w-0 flex-1 truncate selectable" title={h.command}>
-                    {h.command}
-                  </span>
-                  {h.matcher && <Badge tone="off">{h.matcher}</Badge>}
-                  {h.async && <Badge tone="off">{T().async}</Badge>}
-                  {h.timeout !== null && (
-                    <span className="tnum shrink-0 text-faint">{T().timeout(h.timeout)}</span>
-                  )}
-                  <Badge>{h.scope === 'plugin' ? T().fromPlugin(h.plugin ?? '') : scopeLabel(h.scope)}</Badge>
-                </li>
+      {cfg.hooks.length === 0 ? (
+        <p className="text-[13px] text-muted">{T().noHooks}</p>
+      ) : (
+        groupBy(cfg.hooks, (h) => `${h.scope}:${h.plugin ?? ''}`).map(({ key, items, first }) => (
+          <Group
+            key={key}
+            id={`hooks:${key}`}
+            label={ownerLabel(cfg, first)}
+            note={<PathNote path={first.source} />}
+            count={items.length}
+          >
+            <ul className="divide-y divide-line">
+              {items.map((h, i) => (
+                <HookRow key={i} h={h} />
               ))}
-          </ul>
-        </section>
-      ))}
+            </ul>
+          </Group>
+        ))
+      )}
       <Hint>{T().hooksHint}</Hint>
     </div>
   );
