@@ -1,6 +1,7 @@
 """Read-only git for the Git panel: status, the diff of one file, recent commits. Nothing here writes to a repo
 (changes are made in Claude Code or lazygit)."""
 import os
+import re
 import subprocess
 
 from . import paths
@@ -121,6 +122,25 @@ def diff(d, rel, staged=False, untracked=False):
     text = out[:MAX_DIFF].decode('utf-8', 'replace')
     binary = text.startswith('diff --git') and '\nBinary files ' in text[:2000]
     return {'root': root, 'file': rel, 'diff': text, 'truncated': truncated, 'binary': binary}
+
+
+HASH_RE = re.compile(r'^[0-9a-f]{7,40}$')
+
+
+def show(d, commit):
+    """-> {root, hash, diff, truncated}: one commit, header + changed files + patch (merges: their own changes)."""
+    if not isinstance(commit, str) or not HASH_RE.match(commit):
+        raise GitError('bad_request', 'неверный хеш коммита')
+    root = repo_root(d)
+    if not root:
+        raise GitError('not_found', 'это не git-репозиторий')
+    try:
+        out = _git(root, 'show', '--no-color', '--no-ext-diff', '-M', '--stat=100', '--patch', '--format=medium',
+                   '--first-parent', commit, '--')
+    except GitError as e:
+        raise GitError('not_found', f'коммит {commit} не найден: {e}')
+    truncated = len(out) > MAX_DIFF
+    return {'root': root, 'hash': commit, 'diff': out[:MAX_DIFF].decode('utf-8', 'replace'), 'truncated': truncated}
 
 
 def log(d, limit=30):

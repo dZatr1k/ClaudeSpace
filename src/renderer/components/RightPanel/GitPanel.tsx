@@ -189,6 +189,7 @@ function Tasks({
 
 export function GitPanel({ folder }: { folder: string }) {
   const [tick, setTick] = useState(0);
+  const viewer = useUi((u) => u.viewer);
   const [st, retry] = useAgentLoad(
     folder,
     () =>
@@ -291,14 +292,25 @@ export function GitPanel({ folder }: { folder: string }) {
           {log.commits.length === 0 ? (
             <p className="px-2 text-[12px] text-muted">{t.gitPanel.noCommits}</p>
           ) : (
-            <ol className="selectable">
+            <ol>
               {log.commits.map((c) => (
-                <li key={c.hash} className="flex min-w-0 items-baseline gap-2 px-2 py-[3px] text-[12px]">
-                  <span className="mono shrink-0 text-faint">{c.short}</span>
-                  <span className="min-w-0 flex-1 truncate" title={`${c.subject}\n${c.author}`}>
-                    {c.subject}
-                  </span>
-                  <span className="tnum shrink-0 text-faint">{formatAgo(c.at)}</span>
+                <li key={c.hash}>
+                  <button
+                    type="button"
+                    aria-label={t.gitPanel.commitOpen(c.subject)}
+                    aria-current={viewer?.kind === 'commit' && viewer.hash === c.hash ? 'true' : undefined}
+                    className="flex w-full min-w-0 items-baseline gap-2 rounded-[4px] px-2 py-[3px] text-left text-[12px] transition-colors duration-100 hover:bg-hover active:bg-selected aria-[current]:bg-selected"
+                    title={`${c.subject}\n${c.author}`}
+                    onClick={() =>
+                      useUi.getState().set({
+                        viewer: { kind: 'commit', root, hash: c.hash, subject: c.subject },
+                      })
+                    }
+                  >
+                    <span className="mono shrink-0 text-faint">{c.short}</span>
+                    <span className="min-w-0 flex-1 truncate">{c.subject}</span>
+                    <span className="tnum shrink-0 text-faint">{formatAgo(c.at)}</span>
+                  </button>
                 </li>
               ))}
             </ol>

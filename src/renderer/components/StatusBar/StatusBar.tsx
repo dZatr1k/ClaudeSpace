@@ -51,7 +51,7 @@ export function StatusBar() {
       <span className="h-3 w-px bg-line" />
       <button
         className={`${item} ${online ? '' : 'text-faint'}`}
-        title={staleTip}
+        title={staleTip ?? t.statusBar.resourcesTip}
         onClick={() => useUi.getState().set({ system: 'resources' })}
       >
         <Cpu size={13} aria-hidden />
@@ -62,7 +62,7 @@ export function StatusBar() {
       <span className="h-3 w-px bg-line" />
       <button
         className={`${item} ${online ? '' : 'text-faint'}`}
-        title={doctor?.message ?? staleTip}
+        title={doctor?.message ?? staleTip ?? t.statusBar.doctorTip}
         onClick={() => useUi.getState().set({ system: 'doctor' })}
       >
         <Stethoscope size={13} aria-hidden />
@@ -71,7 +71,7 @@ export function StatusBar() {
       <span className="h-3 w-px bg-line" />
       <button
         className={`${item} ${online ? '' : 'text-faint'}`}
-        title={staleTip}
+        title={staleTip ?? t.statusBar.usageTip}
         onClick={() => useUi.getState().set({ system: 'usage' })}
       >
         <Gauge size={13} aria-hidden />

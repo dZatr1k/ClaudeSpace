@@ -1,4 +1,5 @@
 import {
+  ChartColumn,
   BookText,
   Columns2,
   LayoutGrid,
@@ -383,9 +384,13 @@ export function TitleBar() {
           <Kbd>Ctrl K</Kbd>
         </button>
         <SplitMenu />
+        <IconButton title={t.statusBar.usageTip} onClick={() => useUi.getState().set({ system: 'usage' })}>
+          <ChartColumn size={15} aria-hidden />
+          <span className="ml-1 hidden text-[12px] lg:inline">{t.claudeScreen.usageButton}</span>
+        </IconButton>
         <IconButton title={t.claudeScreen.open} onClick={() => openClaudeScreen()}>
           <BookText size={15} aria-hidden />
-          <span className="ml-1 text-[12px]">Claude</span>
+          <span className="ml-1 hidden text-[12px] md:inline">{t.claudeScreen.button}</span>
         </IconButton>
         <IconButton title={`${t.actions.rdp} (Ctrl+Alt+R)`} onClick={() => A.openRdp()}>
           <Monitor size={15} aria-hidden />

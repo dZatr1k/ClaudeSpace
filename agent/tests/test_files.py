@@ -147,6 +147,17 @@ class FilesTest(unittest.TestCase):
         self.assertEqual([c['subject'] for c in log['commits']], ['first commit'])
         self.assertEqual(log['commits'][0]['author'], 'T')
 
+    def test_git_show(self):
+        c = self.ok('git_log', {'path': self.proj})['commits'][0]
+        for h in (c['hash'], c['short']):
+            r = self.ok('git_show', {'path': self.proj, 'hash': h})
+            self.assertIn('first commit', r['diff'])
+            self.assertIn('src/a.py', r['diff'])     # --stat line and the patch
+            self.assertIn('+print(1)', r['diff'])
+        for bad in ('HEAD', '--all', 'abc', 'g' * 40, '1234567;ls'):
+            self.assertEqual(self.err('git_show', {'path': self.proj, 'hash': bad}), 'bad_request', bad)
+        self.assertEqual(self.err('git_show', {'path': self.proj, 'hash': '0' * 40}), 'not_found')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -80,6 +80,13 @@ def send_keys(pane, *keys, literal=False):
     run(['send-keys', '-t', pane] + (['-l'] if literal else []) + list(keys), check=True)
 
 
+def capture(pane):
+    """the visible screen of one pane with colours and attributes (escape sequences), '' if it fails"""
+    if not re.fullmatch(r'%\d{1,6}', pane or ''):
+        raise TmuxError('неверная панель')
+    return run(['capture-pane', '-p', '-e', '-t', pane])
+
+
 def pane_paths():
     """[(session name, pane current path)] for every pane of every session."""
     out = []

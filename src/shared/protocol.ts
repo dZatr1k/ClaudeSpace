@@ -119,6 +119,7 @@ export const methodSchemas = {
     .object({ path, file: path, staged: z.boolean().optional(), untracked: z.boolean().optional() })
     .strict(),
   git_log: z.object({ path, limit: z.number().int().min(1).max(200).optional() }).strict(),
+  git_show: z.object({ path, hash: z.string().regex(/^[0-9a-f]{7,40}$/) }).strict(),
   // quick actions for a running chat: a fixed command typed into its Claude pane (no free text)
   // parallel tasks in git worktrees (<main>/.claude/worktrees/<name>)
   git_worktrees: z.object({ path }).strict(),
@@ -197,7 +198,8 @@ export interface MethodResults {
   git_status: GitStatus;
   git_diff: { root: string; file: string; diff: string; truncated: boolean; binary: boolean };
   git_log: { root: string | null; commits: GitCommit[] };
-  claude_send: { pane: string; status: string };
+  git_show: { root: string; hash: string; diff: string; truncated: boolean };
+  claude_send: { pane: string; status: string; stashed?: boolean };
   claude_config: ClaudeConfig;
   git_worktrees: { main: string; current: string | null; worktrees: GitWorktree[] };
   worktree_create: { path: string; branch: string; base: string | null; created: boolean };

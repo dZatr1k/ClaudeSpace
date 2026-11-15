@@ -172,6 +172,8 @@ export const ru = {
     title: 'Настройки Claude',
     titleIn: (f: string) => `Настройки Claude · ${f}`,
     open: 'Настройки Claude: инструкции, память, MCP, скиллы, плагины, хуки',
+    button: 'Настройки Claude',
+    usageButton: 'Расход',
     refresh: 'Обновить',
     nav: {
       instructions: 'Инструкции',
@@ -252,6 +254,7 @@ export const ru = {
     busy: 'Claude занят. Дождитесь ответа или нажмите «Прервать»',
     noClaude: 'В этой вкладке Claude не запущен',
     failed: (e: string) => `Команда не дошла до Claude: ${e}`,
+    stashed: 'Недописанный текст убран на время команды. Claude вернёт его в поле ввода сам',
     palette: (what: string) => `Claude: ${what}`,
   },
   files: {
@@ -325,6 +328,9 @@ export const ru = {
     diffEmpty: 'Разницы нет: файл совпадает с последним коммитом.',
     diffBinary: 'Двоичный файл изменён, построчной разницы нет.',
     diffTruncated: 'Diff обрезан на 400 КБ.',
+    commitTitle: (short: string, subject: string) => `${short} · ${subject}`,
+    commitOpen: (subject: string) => `Открыть коммит «${subject}»`,
+    pasteHash: 'Вставить хеш в чат',
   },
   images: {
     drop: 'Отпустите, чтобы прикрепить картинку',
@@ -421,6 +427,9 @@ export const ru = {
         : `${n} ${plural(n, ['сессия', 'сессии', 'сессий'])}${w ? `, ${w} ${w % 10 === 1 && w % 100 !== 11 ? 'ждёт' : 'ждут'} ответа` : ''}`,
     usageWindow: (tok: string, left: string) => `окно 5 ч: ${tok}${left ? `, осталось ${left}` : ''}`,
     noUsage: 'usage: нет данных',
+    usageTip: 'Расход токенов: графики по дням, проектам и моделям',
+    resourcesTip: 'Нагрузка VM: процессор, память, диск',
+    doctorTip: 'Проверка совместимости с установленным Claude Code',
     doctorOk: '✓',
     doctorWarn: '⚠ частично',
     doctorError: '✕ формат изменился',

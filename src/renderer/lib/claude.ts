@@ -27,7 +27,8 @@ export const canCommand = (c: ClaudeProc | null) => c?.status === 'idle';
 
 async function send(params: Parameters<typeof agent<'claude_send'>>[1]): Promise<void> {
   try {
-    await agent('claude_send', params);
+    const r = await agent('claude_send', params);
+    if (r.stashed) useUi.getState().toast(t.claudeBar.stashed, 'info');
   } catch (e) {
     useUi.getState().toast(t.claudeBar.failed((e as Error).message), 'error');
   }

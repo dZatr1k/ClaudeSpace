@@ -240,6 +240,7 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
     GIT_COMMITTER_NAME: 'T',
     GIT_COMMITTER_EMAIL: 't@example.com',
   };
+  writeFileSync(join(fh.alpha, 'tool.py'), 'def run():\n    return "ok"  # done\n');
   execFileSync('git', ['-C', fh.alpha, 'add', '-A'], { env: gitEnv });
   execFileSync('git', ['-C', fh.alpha, 'commit', '-qm', 'first'], { env: gitEnv });
   await panel.getByRole('button', { name: 'Новая задача' }).click();
@@ -257,6 +258,11 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await tasks.getByRole('button', { name: 'Удалить задачу fix-login' }).click();
   await win.getByRole('dialog').getByRole('button', { name: 'Удалить' }).click();
   await expect(tasks).toBeHidden({ timeout: 10_000 });
+  // a commit opens with its message, file list and patch
+  await panel.getByRole('button', { name: 'Открыть коммит «first»' }).click();
+  await expect(viewer.locator('pre')).toContainText('tool.py | 2 ++');
+  await expect(viewer.locator('pre')).toContainText('+    return "ok"  # done');
+  await win.keyboard.press('Escape');
   // upload from the PC: through main -> agent check -> SFTP; an existing name needs overwrite; ~/.ssh is refused
   const up = (dir: string, name: string, overwrite?: boolean) =>
     win.evaluate(
@@ -278,6 +284,12 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await panel.getByRole('button', { name: 'Обновить' }).click();
   await expect(tree.getByRole('button', { name: /^notes\.txt/ })).toBeVisible();
   await win.screenshot({ path: join(SHOTS, '16-files.png') });
+  // code is highlighted by its extension
+  await tree.getByRole('button', { name: /^tool\.py/ }).click();
+  await expect(viewer.locator('pre.hl .hljs-keyword').first()).toHaveText('def');
+  await expect(viewer.locator('pre.hl .hljs-comment')).toHaveText('# done');
+  await win.screenshot({ path: join(SHOTS, '26-highlight.png') });
+  await win.keyboard.press('Escape');
   await panel.getByRole('tab', { name: 'Сведения' }).click();
 
   // palette

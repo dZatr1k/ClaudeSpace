@@ -45,7 +45,8 @@ export type Dialog =
 /** the file / diff viewer over the window (stage 5) */
 export type Viewer =
   | { kind: 'file'; path: string }
-  | { kind: 'diff'; root: string; file: string; staged: boolean; untracked: boolean };
+  | { kind: 'diff'; root: string; file: string; staged: boolean; untracked: boolean }
+  | { kind: 'commit'; root: string; hash: string; subject: string };
 
 interface UiStore {
   selection: Selection;

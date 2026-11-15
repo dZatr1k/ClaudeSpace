@@ -26,10 +26,10 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 if HERE not in sys.path:          # -I (isolated, safe-path) does not put the script dir on sys.path
     sys.path.insert(0, HERE)
 
-from cclib import (askpass, chats, claudecfg, doctor, files, gitview, netstat, paths, projects, search,  # noqa: E402
-                   sessions, system, tmux, turns, usage, winfs, worktrees)
+from cclib import (askpass, chats, claudecfg, claudeinput, doctor, files, gitview, netstat, paths,  # noqa: E402
+                   projects, search, sessions, system, tmux, turns, usage, winfs, worktrees)
 
-AGENT_VERSION = '0.3.0'
+AGENT_VERSION = '0.4.0'
 PROTOCOL = 1
 MAX_FRAME = 4 * 1024 * 1024
 POLL = {'sessions': 1.0, 'tmux': 2.0, 'chats': 3.0, 'projects': 30.0, 'system': 10.0, 'winfs': 5.0, 'ports': 3.0, 'askpass': 2.0}
@@ -37,7 +37,7 @@ WINDOW_RE = re.compile(r'^[0-9]{1,4}$')
 SEARCH_ID_RE = re.compile(r'^[A-Za-z0-9_-]{1,32}$')
 SLOW = {'usage', 'doctor', 'system', 'project_preview', 'session_preview', 'mosh_list', 'mosh_kill_stale',
         'create_project', 'winfs_mount', 'winfs_unmount', 'pc_tunnel_status', 'askpass_enable',
-        'fs_list', 'fs_read', 'git_status', 'git_diff', 'git_log', 'claude_send',
+        'fs_list', 'fs_read', 'git_status', 'git_diff', 'git_log', 'git_show', 'claude_send',
         'claude_config', 'claude_doc_write', 'git_worktrees', 'worktree_create', 'worktree_remove',
         'usage_report'}
 TUNNEL_PORT = 2222
@@ -179,6 +179,7 @@ class Agent:
             'fs_list': self.m_fs_list, 'fs_read': self.m_fs_read, 'fs_upload_target': self.m_fs_upload_target,
             'fs_download_source': self.m_fs_download_source,
             'git_status': self.m_git_status, 'git_diff': self.m_git_diff, 'git_log': self.m_git_log,
+            'git_show': self.m_git_show,
             'claude_send': self.m_claude_send, 'usage_report': self.m_usage_report,
             'git_worktrees': self.m_git_worktrees, 'worktree_create': self.m_worktree_create,
             'worktree_remove': self.m_worktree_remove,
@@ -610,16 +611,23 @@ class Agent:
         # at the empty prompt of an idle Claude; Esc (interrupt) is safe in any state
         if action != 'interrupt' and pr['status'] != 'idle':
             raise AgentError('busy', 'Claude сейчас занят: дождитесь ответа или прервите его', {'status': pr['status']})
+        stashed = False
         try:
             if action == 'interrupt':
                 tmux.send_keys(pane, 'Escape')
             else:
+                # a draft in the input box would get the command appended: put it aside with Claude Code's stash
+                # (Ctrl+S), Claude Code restores it by itself after the command
+                if claudeinput.draft(tmux.capture(pane)):
+                    tmux.send_keys(pane, 'C-s')
+                    stashed = True
+                    time.sleep(0.15)
                 tmux.send_keys(pane, text, literal=True)
                 time.sleep(0.15)    # let the input box take the text before Enter (the slash menu filters as it types)
                 tmux.send_keys(pane, 'Enter')
         except tmux.TmuxError as e:
             raise AgentError('internal', f'tmux: {e}')
-        return {'pane': pane, 'status': pr['status']}
+        return {'pane': pane, 'status': pr['status'], 'stashed': stashed}
 
     def m_rename_session(self, p):
         name = p_session(p)
@@ -804,6 +812,10 @@ class Agent:
     def m_git_log(self, p):
         d = self._wrap(files.resolve, p_str(p, 'path'), 'dir')
         return self._wrap(gitview.log, d, p_int(p, 'limit', 30, 1, 200))
+
+    def m_git_show(self, p):
+        d = self._wrap(files.resolve, p_str(p, 'path'), 'dir')
+        return self._wrap(gitview.show, d, p_str(p, 'hash', pattern=gitview.HASH_RE))
 
     # ---- parallel tasks in git worktrees: list, create (branch + folder), remove (clean, no session inside)
     def m_git_worktrees(self, p):

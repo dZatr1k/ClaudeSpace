@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+- Claude bar: text you had started typing no longer gets the command appended to it. The app puts the draft
+  aside with Claude Code's own stash (Ctrl+S), and Claude Code brings it back once the command has run.
+- Syntax highlighting in the file viewer for common languages (TypeScript, Python, C#, shell, JSON, YAML and
+  more), also in fenced code blocks of markdown documents.
+- Git tab: a commit opens with its message, changed files and patch.
+- The Claude settings and usage screens have labelled buttons in the title bar («Настройки Claude», «Расход»).
+
 ## 0.7.0
 - Several chats on screen: the layout button in the title bar shows one tab, two side by side, two stacked or
   four. Clicking a tab puts it into the focused pane; Ctrl+Alt+← / → moves between panes. The layout is restored

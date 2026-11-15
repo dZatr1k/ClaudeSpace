@@ -354,3 +354,79 @@ textarea,
   padding: 4px 8px;
   text-align: left;
 }
+
+/* ---------------------------------------------------------------- syntax highlighting (file viewer, highlight.js) */
+/* colours from the terminal ANSI palette of each theme, so code looks the same as in Claude's own output */
+[data-theme='dark'] {
+  --hl-keyword: #cc99ec;
+  --hl-string: #55c482;
+  --hl-number: #e6b84a;
+  --hl-comment: #8a837b;
+  --hl-title: #74abf6;
+  --hl-type: #62cbd9;
+  --hl-attr: #f6d06f;
+  --hl-meta: #ff8f84;
+}
+[data-theme='light'] {
+  --hl-keyword: #8a3fa8;
+  --hl-string: #16773a;
+  --hl-number: #8f5f00;
+  --hl-comment: #6b645c;
+  --hl-title: #1d58c8;
+  --hl-type: #0b717a;
+  --hl-attr: #8f5f00;
+  --hl-meta: #bf2a24;
+}
+.hl .hljs-keyword,
+.hl .hljs-selector-tag,
+.hl .hljs-literal,
+.hl .hljs-doctag {
+  color: var(--hl-keyword);
+}
+.hl .hljs-string,
+.hl .hljs-regexp,
+.hl .hljs-addition,
+.hl .hljs-template-tag {
+  color: var(--hl-string);
+}
+.hl .hljs-number,
+.hl .hljs-symbol,
+.hl .hljs-bullet {
+  color: var(--hl-number);
+}
+.hl .hljs-comment,
+.hl .hljs-quote {
+  color: var(--hl-comment);
+  font-style: italic;
+}
+.hl .hljs-title,
+.hl .hljs-section,
+.hl .hljs-name {
+  color: var(--hl-title);
+}
+.hl .hljs-type,
+.hl .hljs-built_in,
+.hl .hljs-class .hljs-title,
+.hl .hljs-title.class_ {
+  color: var(--hl-type);
+}
+.hl .hljs-attr,
+.hl .hljs-attribute,
+.hl .hljs-variable,
+.hl .hljs-template-variable,
+.hl .hljs-property,
+.hl .hljs-selector-class,
+.hl .hljs-selector-id {
+  color: var(--hl-attr);
+}
+.hl .hljs-meta,
+.hl .hljs-deletion,
+.hl .hljs-tag {
+  color: var(--hl-meta);
+}
+.hl .hljs-emphasis {
+  font-style: italic;
+}
+.hl .hljs-strong {
+  font-weight: 600;
+}
