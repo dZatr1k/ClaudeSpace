@@ -60,8 +60,9 @@ interface UiStore {
   /** full-text chat search overlay: the initial query, null = closed */
   chatSearch: string | null;
   system: SystemSection | null;
-  /** the «Claude» screen: section and the folder project-level files are looked up from (null = user only) */
-  claudeScreen: { section: ClaudeSection; folder: string | null } | null;
+  /** the «Claude» screen: section, the folder project-level files are looked up from (null = user only) and the
+   * item to select there (a skill path) */
+  claudeScreen: { section: ClaudeSection; folder: string | null; item?: string | null } | null;
   /** groups on the «Claude» screen the user opened or closed, by `${section}:${key}`; unset = the group's default */
   claudeGroups: Record<string, boolean>;
   settingsOpen: SettingsSection | null;

@@ -230,6 +230,7 @@ export const ru = {
     pluginEmpty: 'Скиллов и хуков в плагине нет.',
     pluginSkills: 'Скиллы',
     pluginHooks: 'Хуки',
+    openSkill: 'Открыть в разделе «Скиллы»',
     noHooks: 'Хуков нет.',
     async: 'в фоне',
     timeout: (s: number) => `${s} с`,

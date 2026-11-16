@@ -4,7 +4,7 @@
 // was loaded (cclib/claudecfg.py).
 import { ChevronRight, RotateCw, Save } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import type { ClaudeConfig, ClaudeDoc, ClaudeHook, ClaudeMemoryFile } from '@shared/protocol';
+import type { ClaudeConfig, ClaudeDoc, ClaudeHook, ClaudeMemoryFile, ClaudeSkill } from '@shared/protocol';
 import { openVsCode } from '../../actions';
 import { agent, invoke } from '../../bridge';
 import { t } from '../../i18n/ru';
@@ -177,16 +177,19 @@ function Item({
   title,
   sub,
   dim,
+  hint,
 }: {
   active: boolean;
   onClick: () => void;
   title: string;
   sub?: string | null;
   dim?: boolean;
+  hint?: string;
 }) {
   return (
     <button
       type="button"
+      title={hint}
       aria-current={active ? 'true' : undefined}
       className={`block w-full rounded-[6px] px-2.5 py-1.5 text-left transition-colors duration-100 hover:bg-hover active:bg-selected ${active ? 'bg-selected' : ''}`}
       onClick={onClick}
@@ -436,8 +439,11 @@ function Memory({ cfg, onDirty }: { cfg: ClaudeConfig; onDirty: (d: boolean) => 
   );
 }
 
-function Skills({ cfg }: { cfg: ClaudeConfig }) {
-  const [path, setPath] = useState<string | null>(cfg.skills[0]?.path ?? null);
+/** `initial`: the skill to show first (a click on it under its plugin), else the first one */
+function Skills({ cfg, initial }: { cfg: ClaudeConfig; initial?: string | null }) {
+  const [path, setPath] = useState<string | null>(
+    cfg.skills.find((s) => s.path === initial)?.path ?? cfg.skills[0]?.path ?? null,
+  );
   if (!cfg.skills.length) return <p className="text-[13px] text-muted">{T().noSkills}</p>;
   const groups = groupBy(cfg.skills, (s) => `${s.scope}:${s.plugin ?? ''}`);
   return (
@@ -520,7 +526,7 @@ function HookRow({ h }: { h: ClaudeHook }) {
   );
 }
 
-function Plugins({ cfg }: { cfg: ClaudeConfig }) {
+function Plugins({ cfg, openSkill }: { cfg: ClaudeConfig; openSkill: (s: ClaudeSkill) => void }) {
   return (
     <div>
       {cfg.plugins.length === 0 ? (
@@ -558,11 +564,14 @@ function Plugins({ cfg }: { cfg: ClaudeConfig }) {
                       <h4 className="px-2.5 pb-0.5 pt-1.5 text-[12px] text-muted">{T().pluginSkills}</h4>
                       <ul>
                         {skills.map((s) => (
-                          <li key={s.path} className="px-2.5 py-1">
-                            <span className="block truncate text-[13px]">{s.name}</span>
-                            {s.description && (
-                              <span className="block truncate text-[12px] text-faint">{s.description}</span>
-                            )}
+                          <li key={s.path}>
+                            <Item
+                              active={false}
+                              onClick={() => openSkill(s)}
+                              title={s.name}
+                              sub={s.description}
+                              hint={T().openSkill}
+                            />
                           </li>
                         ))}
                       </ul>
@@ -658,7 +667,14 @@ export function ClaudeScreen() {
       },
     });
   };
-  const go = (section: ClaudeSection) => guard(() => ui.set({ claudeScreen: { section, folder } }));
+  const go = (section: ClaudeSection, item: string | null = null) =>
+    guard(() => ui.set({ claudeScreen: { section, folder, item } }));
+  /** from a plugin to its skill: the Skills section with that skill selected and its group open */
+  const openSkill = (s: ClaudeSkill) => {
+    const id = `skills:${s.scope}:${s.plugin ?? ''}`;
+    ui.set({ claudeGroups: { ...useUi.getState().claudeGroups, [id]: true } });
+    go('skills', s.path);
+  };
   const cfg = st.state === 'ok' ? st.data : null;
   const count = (s: ClaudeSection): number | null => {
     if (!cfg) return null;
@@ -711,9 +727,9 @@ export function ClaudeScreen() {
             <Instructions cfg={cfg} onDirty={onDirty} reload={() => void load()} />
           )}
           {cfg && open.section === 'memory' && <Memory cfg={cfg} onDirty={onDirty} />}
-          {cfg && open.section === 'skills' && <Skills cfg={cfg} />}
+          {cfg && open.section === 'skills' && <Skills cfg={cfg} initial={open.item} />}
           {cfg && open.section === 'mcp' && <Mcp cfg={cfg} />}
-          {cfg && open.section === 'plugins' && <Plugins cfg={cfg} />}
+          {cfg && open.section === 'plugins' && <Plugins cfg={cfg} openSkill={openSkill} />}
           {cfg && open.section === 'hooks' && <Hooks cfg={cfg} />}
         </div>
       </div>

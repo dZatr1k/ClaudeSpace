@@ -426,7 +426,14 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await setTheme(win, 'light');
   await win.screenshot({ path: join(ROOT, 'test-results', 'markdown-table-light.png') });
   await setTheme(win, 'dark');
-  await expect(cs.locator('[data-group="skills:plugin:demo"]')).toContainText('Плагин demo');
+  const demoSkills = cs.locator('[data-group="skills:plugin:demo"]');
+  await expect(demoSkills).toContainText('Плагин demo');
+  // collapsed here; opening the skill from its plugin below must open the group again
+  await demoSkills.getByRole('button', { name: /^Плагин demo/ }).click();
+  await expect(demoSkills.getByRole('button', { name: /^Плагин demo/ })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
   await cs.getByRole('button', { name: /^Память/ }).click();
   await expect(betaHead).toHaveAttribute('aria-expanded', 'true');
   // a plugin lists what it brings: its skills and hooks
@@ -435,6 +442,18 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await expect(demo).toContainText('demo-skill');
   await expect(demo).toContainText('PreToolUse');
   await win.screenshot({ path: join(SHOTS, '32-claude-plugins.png') });
+  // a skill under its plugin opens in the Skills section, selected, with its group open
+  await demo.getByRole('button', { name: /^demo-skill/ }).click();
+  await expect(cs).toHaveAttribute('data-claude-screen', 'skills');
+  await expect(demoSkills.getByRole('button', { name: /^Плагин demo/ })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await expect(demoSkills.getByRole('button', { name: /^demo-skill/ })).toHaveAttribute(
+    'aria-current',
+    'true',
+  );
+  await expect(cs.locator('.md-doc pre code').first()).toContainText('name: demo-skill');
   await cs.getByRole('button', { name: /^Хуки/ }).click();
   await expect(cs.locator('[data-group="hooks:user:"]')).toContainText('notify.sh');
   await expect(cs.locator('[data-group="hooks:plugin:demo"]')).toContainText('check.sh');
