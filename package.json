@@ -1,7 +1,7 @@
 {
   "name": "claudespace",
   "productName": "ClaudeSpace",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "description": "Desktop app for working with Claude Code on a VM over SSH",
   "private": true,
   "license": "MIT",
