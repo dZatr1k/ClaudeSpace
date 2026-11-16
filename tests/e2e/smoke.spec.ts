@@ -340,7 +340,12 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   put(
     join(claudeDir, 'skills', 'review'),
     'SKILL.md',
-    '---\nname: review\ndescription: Проверка правок\n---\n',
+    [
+      '---\nname: review\ndescription: Проверка правок\n---\n',
+      '## Признаки\n',
+      '| Приём | Когда уместен |\n|---|:-:|\n| **Свечение** | только у фокуса |\n| ~~Градиент~~ | для иерархии |\n',
+      '- [x] таблицы\n- [ ] всё остальное\n',
+    ].join('\n'),
   );
   const plug = join(claudeDir, 'plugins', 'cache', 'demo-market', 'demo', '1.0.0');
   put(
@@ -407,6 +412,20 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   // the open/closed state survives switching sections
   await cs.getByRole('button', { name: /^Скиллы/ }).click();
   await expect(cs.locator('[data-group="skills:user:"]')).toContainText('review');
+  // GFM in a skill file: a real table (not pipes as text), strikethrough, a task list
+  const doc = cs.locator('.md-doc');
+  await expect(doc.locator('.md-table th').first()).toHaveText('Приём');
+  await expect(doc.locator('td').first()).toHaveText('Свечение');
+  await expect(doc.locator('td del')).toHaveText('Градиент');
+  await expect(doc.locator('input[type=checkbox]')).toHaveCount(2);
+  await expect(doc).not.toContainText('|---|');
+  // front matter is a yaml block, not a rule plus a heading
+  await expect(doc.locator('hr')).toHaveCount(0);
+  await expect(doc.locator('pre code').first()).toContainText('description: Проверка правок');
+  await win.screenshot({ path: join(SHOTS, '33-markdown-table.png') });
+  await setTheme(win, 'light');
+  await win.screenshot({ path: join(ROOT, 'test-results', 'markdown-table-light.png') });
+  await setTheme(win, 'dark');
   await expect(cs.locator('[data-group="skills:plugin:demo"]')).toContainText('Плагин demo');
   await cs.getByRole('button', { name: /^Память/ }).click();
   await expect(betaHead).toHaveAttribute('aria-expanded', 'true');

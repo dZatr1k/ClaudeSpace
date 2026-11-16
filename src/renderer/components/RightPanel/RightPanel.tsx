@@ -13,7 +13,6 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
 import type { Chat, ChatMessage, GitDetails, Project, Selection, SessionDetails } from '@shared/model';
 import * as A from '../../actions';
 import { agent } from '../../bridge';
@@ -42,6 +41,7 @@ import { useTabs } from '../../stores/tabs';
 import { useUi } from '../../stores/ui';
 import { chatMenu } from '../menus';
 import { Button } from '../ui/Button';
+import { Markdown } from '../ui/Markdown';
 import { DropdownMenu } from '../ui/Menu';
 import { StatusIcon } from '../ui/StatusIcon';
 
@@ -121,9 +121,7 @@ function ChatInfo({ chat }: { chat: Chat }) {
                 {m.role === 'user' ? t.info.you : t.info.claude}
               </div>
               <div className="md text-[12px] leading-relaxed selectable">
-                <ReactMarkdown skipHtml disallowedElements={['img']} unwrapDisallowed>
-                  {m.text.length > 600 ? m.text.slice(0, 600) + '…' : m.text}
-                </ReactMarkdown>
+                <Markdown>{m.text.length > 600 ? m.text.slice(0, 600) + '…' : m.text}</Markdown>
               </div>
             </div>
           ))}

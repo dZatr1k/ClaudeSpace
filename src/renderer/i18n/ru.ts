@@ -236,6 +236,10 @@ export const ru = {
     hooksHint:
       'Хуки задаются в ~/.claude/settings.json и .claude/settings.json проекта. settings.local.json не читается: там секреты.',
   },
+  md: {
+    footnotes: 'Сноски',
+    footnoteBack: (n: number) => `Вернуться к сноске ${n} в тексте`,
+  },
   claudeBar: {
     label: 'Действия с Claude',
     interrupt: 'Прервать',

@@ -3,7 +3,6 @@
 // download to the PC, open in VS Code.
 import { Code, Download, FileText, TextCursorInput } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
 import type { FsFile, MethodResults } from '@shared/protocol';
 import { openVsCode } from '../../actions';
 import { agent } from '../../bridge';
@@ -14,6 +13,7 @@ import { highlightLines, languageFor } from '../../lib/highlight';
 import { useUi } from '../../stores/ui';
 import type { Viewer } from '../../stores/ui';
 import { Button } from '../ui/Button';
+import { Markdown, frontMatterAsCode } from '../ui/Markdown';
 import { Modal } from '../ui/Modal';
 
 type Loaded<T> = { state: 'loading' } | { state: 'error'; message: string } | { state: 'ok'; data: T };
@@ -169,14 +169,7 @@ export function FileBody({ path }: { path: string }) {
       {f.kind === 'text' &&
         (isMd && rendered ? (
           <div className="md md-doc selectable rounded-[6px] bg-base px-5 py-4 text-[13px] leading-relaxed">
-            <ReactMarkdown
-              skipHtml
-              disallowedElements={['img']}
-              unwrapDisallowed
-              components={{ code: MdCode }}
-            >
-              {f.text}
-            </ReactMarkdown>
+            <Markdown components={{ code: MdCode }}>{frontMatterAsCode(f.text)}</Markdown>
           </div>
         ) : (
           <TextBody text={f.text} lang={languageFor(f.path)} />

@@ -344,15 +344,44 @@ textarea,
   border-left: 2px solid var(--border-strong);
   color: var(--text-muted);
 }
-.md-doc table {
+/* GFM (components/ui/Markdown.tsx), in the chat preview and in documents: a table on a hairline grid with the
+ * header row on the panel colour; a table wider than the box scrolls inside .md-table, the page does not */
+.md-table {
+  overflow-x: auto;
+  margin: 4px 0 8px;
+}
+.md table {
   border-collapse: collapse;
+}
+.md th,
+.md td {
+  border: 1px solid var(--border-strong);
+  padding: 2px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.md th {
+  font-weight: 600;
+  background: var(--bg-surface);
+}
+.md-doc .md-table {
   margin: 8px 0 12px;
 }
 .md-doc th,
 .md-doc td {
-  border: 1px solid var(--border-strong);
   padding: 4px 8px;
-  text-align: left;
+}
+.md del {
+  color: var(--text-muted);
+}
+.md .contains-task-list {
+  list-style: none;
+  margin-left: 2px;
+}
+.md .task-list-item input {
+  margin: 0 6px 0 0;
+  vertical-align: -1px;
+  accent-color: var(--accent);
 }
 
 /* ---------------------------------------------------------------- syntax highlighting (file viewer, highlight.js) */
