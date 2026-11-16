@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.7.7
+- Claude settings → Plugins: a click on a plugin's skill opens it in Skills, selected, with its group opened.
+
 ## 0.7.6
 - Markdown (file viewer, skills on the Claude screen, chat preview): tables, strikethrough, task lists, bare links
   and footnotes are rendered instead of shown as raw text with pipes. A table wider than the view scrolls inside
