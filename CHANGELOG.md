@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.6
+- Markdown (file viewer, skills on the Claude screen, chat preview): tables, strikethrough, task lists, bare links
+  and footnotes are rendered instead of shown as raw text with pipes. A table wider than the view scrolls inside
+  its own box.
+- The YAML header of skills and memory notes is shown as a yaml block. Before, its `---` lines turned into a rule
+  and a heading with all fields run together.
+
 ## 0.7.5
 - Claude settings: every list is split into collapsible groups by whose it is (all projects, a project, a plugin);
   memory notes are grouped by project, CLAUDE.md files by folder. Other projects' notes start collapsed. Groups
