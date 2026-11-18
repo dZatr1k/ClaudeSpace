@@ -82,8 +82,11 @@ export const ipcSchemas = {
     })
     .strict(),
   'file.reveal': z.object({ path: z.string().min(1).max(4096) }).strict(),
-  'image.upload': z
-    .object({ data: z.instanceof(Uint8Array).refine((d) => d.length <= 20 * 1024 * 1024) })
+  'attach.upload': z
+    .object({
+      name: z.string().min(1).max(255),
+      data: z.instanceof(Uint8Array).refine((d) => d.length <= FILE_UPLOAD_MAX),
+    })
     .strict(),
   'launch.rdp': z.undefined(),
   'launch.vscode': z.object({ path: z.string().min(1).max(4096) }).strict(),
@@ -194,9 +197,9 @@ export interface IpcContract {
   };
   /** show a file this app just downloaded in Explorer */
   'file.reveal': { args: { path: string }; result: void };
-  /** upload dropped image bytes to the VM */
-  'image.upload': {
-    args: { data: Uint8Array };
+  /** a file dropped on or picked for a chat: upload to the VM cache (main/attach.ts), result = path on the VM */
+  'attach.upload': {
+    args: { name: string; data: Uint8Array };
     result: { ok: true; path: string } | { ok: false; error: string };
   };
   'launch.rdp': { args: undefined; result: { ok: boolean; error?: string; notConfigured?: boolean } };

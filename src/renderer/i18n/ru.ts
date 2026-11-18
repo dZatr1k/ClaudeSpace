@@ -114,6 +114,7 @@ export const ru = {
     fontSmaller: 'Мельче шрифт терминала',
     fontReset: 'Сбросить размер шрифта',
     find: 'Найти в терминале',
+    attach: 'Прикрепить файлы…',
     copy: 'Копировать',
     paste: 'Вставить',
     selectAll: 'Выделить всё',
@@ -342,13 +343,17 @@ export const ru = {
     commitOpen: (subject: string) => `Открыть коммит «${subject}»`,
     pasteHash: 'Вставить хеш в чат',
   },
-  images: {
-    drop: 'Отпустите, чтобы прикрепить картинку',
-    dropHint: 'Она загрузится на VM, а в чат вставится путь к ней',
-    uploading: 'Загружаю картинку на VM…',
-    notImage: 'Прикрепить можно только картинки PNG, JPEG, GIF и WebP',
-    tooBig: (name: string) => `${name} больше 20 МБ`,
-    failed: (e: string) => `Картинка не загрузилась: ${e}`,
+  attach: {
+    drop: 'Отпустите, чтобы прикрепить к чату',
+    dropHint: 'Файл загрузится на VM, а в чат вставится путь к нему',
+    uploading: 'Загружаю на VM…',
+    tooBig: 'файл больше 100 МБ',
+    failed: (name: string, e: string) => `${name} не прикрепился: ${e}`,
+    imageFailed: (e: string) => `Картинка не загрузилась: ${e}`,
+    noTab: 'Откройте вкладку с чатом, чтобы прикрепить к нему файл.',
+    button: 'Прикрепить',
+    buttonHint:
+      'Выбрать файлы на компьютере. Они загрузятся на VM, а в чат вставятся пути к ним (Ctrl+Shift+A)',
   },
   term: {
     connecting: (s: string) => `Подключаюсь к «${s}»…`,

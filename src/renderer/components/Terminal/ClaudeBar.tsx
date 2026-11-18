@@ -1,9 +1,10 @@
 // Strip under the terminal of a tab with Claude running: its status and the actions people otherwise type
 // (Esc, /compact, /clear, /model). Commands are only enabled while Claude is idle (lib/claude.ts says why).
-import { ChevronDown, Cpu, Eraser, FoldVertical, Square } from 'lucide-react';
+import { ChevronDown, Cpu, Eraser, FoldVertical, Paperclip, Square } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CLAUDE_MODELS } from '@shared/protocol';
 import { t } from '../../i18n/ru';
+import { attachToActive } from '../../lib/attach';
 import { canCommand, canInterrupt, claudeAction, setModel } from '../../lib/claude';
 import { claudeUi, isUnknownStatus, primaryClaude, statusLine } from '../../lib/status';
 import { useConn } from '../../stores/conn';
@@ -45,6 +46,9 @@ export function ClaudeBar() {
       <span className="tnum min-w-0 flex-1 truncate pl-1 text-[12px] text-muted" aria-live="polite">
         {statusLine(c.status, c.statusAt)}
       </span>
+      <button type="button" className={btn} title={t.attach.buttonHint} onClick={() => void attachToActive()}>
+        <Paperclip size={13} aria-hidden /> {t.attach.button}
+      </button>
       {canInterrupt(c) && (
         <button
           type="button"

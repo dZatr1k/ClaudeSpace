@@ -4,7 +4,7 @@
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ROOT, TMUX_SOCKET, ensureBundle, killTmux, makeFakeHome, tmux } from '../integration/helpers';
@@ -210,6 +210,22 @@ test('main window, sidebar, terminal, overlays, reconnect, restore', async () =>
   await expect(win.getByRole('dialog')).toContainText('Начать разговор заново?');
   await win.screenshot({ path: join(SHOTS, '18-claude-bar.png') });
   await win.keyboard.press('Escape');
+  // «Прикрепить»: the system file dialog -> any file type lands in the VM cache, its path is typed into the chat
+  const pc = mkdtempSync(join(tmpdir(), 'cs-pc-'));
+  writeFileSync(join(pc, 'notes.md'), '# notes');
+  writeFileSync(join(pc, 'spec v2.pdf'), '%PDF-1.7\n%fake\n');
+  const chooser = win.waitForEvent('filechooser');
+  await bar.getByRole('button', { name: 'Прикрепить' }).click();
+  await (await chooser).setFiles([join(pc, 'notes.md'), join(pc, 'spec v2.pdf')]);
+  await expect(win.locator('.xterm-rows').first()).toContainText('spec_v2.pdf', { timeout: 10_000 });
+  await expect(win.locator('.xterm-rows').first()).toContainText('notes.md');
+  const cached = join(fh.home, '.cache', 'claudespace', 'files');
+  expect(
+    readdirSync(cached)
+      .flatMap((d) => readdirSync(join(cached, d)))
+      .sort(),
+  ).toEqual(['notes.md', 'spec_v2.pdf']);
+  rmSync(pc, { recursive: true, force: true });
   writeFileSync(reg, readFileSync(reg, 'utf8').replace('"status":"idle"', '"status":"busy"'));
   await expect(bar).toContainText('думает', { timeout: 5000 });
   // chat title -> the chat in the «Чаты» list, selected

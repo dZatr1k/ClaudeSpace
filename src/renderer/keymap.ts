@@ -31,6 +31,7 @@ export type AppCommandId =
   | 'term.find'
   | 'term.copy'
   | 'term.paste'
+  | 'term.attach'
   | 'font.bigger'
   | 'font.smaller'
   | 'font.reset'
@@ -117,6 +118,8 @@ export function appShortcut(e: KeyLike, inTerminal: boolean, dev = false): AppCo
         return 'system.usage';
       case 'H':
         return 'search.chats';
+      case 'A':
+        return 'term.attach';
     }
     return null;
   }
@@ -160,6 +163,7 @@ export const HOTKEY_LABELS: Partial<Record<AppCommandId, string>> = {
   'right.toggle': 'Ctrl+Shift+J',
   'sidebar.focus': 'Ctrl+Shift+E',
   'term.find': 'Ctrl+Shift+F',
+  'term.attach': 'Ctrl+Shift+A',
   settings: 'Ctrl+,',
   'system.usage': 'Ctrl+Shift+U',
   rdp: 'Ctrl+Alt+R',

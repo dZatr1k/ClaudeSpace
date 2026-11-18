@@ -24,9 +24,11 @@ describe('appShortcut', () => {
     expect(appShortcut(k('r', { ctrlKey: true, altKey: true }, 'KeyR'), true)).toBe('rdp');
     expect(appShortcut(k('F5'), true)).toBe('resync');
     expect(appShortcut(k('0', { ctrlKey: true }, 'Digit0'), true)).toBe('font.reset');
+    expect(appShortcut(k('A', { ctrlKey: true, shiftKey: true }, 'KeyA'), true)).toBe('term.attach');
+    expect(appShortcut(k('Ф', { ctrlKey: true, shiftKey: true }, 'KeyA'), true)).toBe('term.attach');
   });
   it('terminal keys stay in the terminal', () => {
-    for (const key of ['w', 't', 'r', 'l', 'o', 'b', 'c', 'v', 'd']) {
+    for (const key of ['w', 't', 'r', 'l', 'o', 'b', 'c', 'v', 'd', 'a']) {
       expect(appShortcut(k(key, { ctrlKey: true }, `Key${key.toUpperCase()}`), true)).toBeNull();
     }
     expect(appShortcut(k('Escape'), true)).toBeNull();

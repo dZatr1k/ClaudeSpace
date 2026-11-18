@@ -2,7 +2,7 @@
 import { defaultSettings } from '@shared/settings';
 import { CLAUDE_MODELS } from '@shared/protocol';
 import { activeClaude, canCommand, canInterrupt, claudeAction, setModel } from './lib/claude';
-import { pasteClipboardImage } from './lib/images';
+import { attachToActive, pasteClipboardImage } from './lib/attach';
 import { newTaskDialog } from './lib/worktrees';
 import { SPLIT_MODES } from './lib/panes';
 import { openClaudeScreen } from './components/Overlays/ClaudeScreen';
@@ -173,6 +173,9 @@ export function runAppCommand(id: AppCommandId): void {
       return;
     case 'term.paste':
       void pasteToActive();
+      return;
+    case 'term.attach':
+      void attachToActive();
       return;
     case 'font.bigger':
       setFont(1);
@@ -383,6 +386,13 @@ export function getCommands(): Command[] {
       hotkey: hk('term.find'),
       when: () => !!activeTab(),
       run: () => runAppCommand('term.find'),
+    },
+    {
+      id: 'term.attach',
+      title: t.actions.attach,
+      hotkey: hk('term.attach'),
+      when: () => !!activeTab(),
+      run: () => runAppCommand('term.attach'),
     },
     {
       id: 'font.bigger',

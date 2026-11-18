@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, CircleStop, ImagePlus, LoaderCircle, Unplug, WifiOff } from 'lucide-react';
+import { CircleAlert, CircleCheck, CircleStop, LoaderCircle, Paperclip, Unplug, WifiOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import type { Tab } from '@shared/model';
@@ -9,7 +9,7 @@ import { t } from '../../i18n/ru';
 import { appShortcut, terminalKey } from '../../keymap';
 import { useConn } from '../../stores/conn';
 import { useData } from '../../stores/data';
-import { attachDroppedFiles } from '../../lib/images';
+import { attachFiles, attachToActive } from '../../lib/attach';
 import { useTabs } from '../../stores/tabs';
 import { paneRect } from '../../lib/panes';
 import { useTabInfo } from '../../lib/tabInfo';
@@ -319,6 +319,7 @@ export function TerminalView({
     { label: t.actions.selectAll, run: () => getHandle(tab.id)?.term.selectAll() },
     ...(isShell ? [{ label: t.actions.clear, run: () => getHandle(tab.id)?.term.clear() }] : []),
     { label: t.actions.find, hint: 'Ctrl+Shift+F', run: () => findInActive() },
+    { label: t.actions.attach, hint: 'Ctrl+Shift+A', run: () => void attachToActive() },
   ];
   const dimmed = !online || tab.term === 'offline';
   const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files');
@@ -362,7 +363,7 @@ export function TerminalView({
         setDragging(false);
         if (!hasFiles(e) || dimmed) return;
         e.preventDefault();
-        void attachDroppedFiles(tab.id, Array.from(e.dataTransfer.files));
+        void attachFiles(tab.id, Array.from(e.dataTransfer.files));
       }}
       onWheel={(e) => {
         if (e.ctrlKey) {
@@ -389,11 +390,11 @@ export function TerminalView({
       {dragging && (
         <div
           className="pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-accent bg-base/80"
-          data-testid="image-drop"
+          data-testid="attach-drop"
         >
-          <ImagePlus size={24} className="text-accent-text" aria-hidden />
-          <div className="text-[14px] font-semibold">{t.images.drop}</div>
-          <div className="text-[12px] text-muted">{t.images.dropHint}</div>
+          <Paperclip size={24} className="text-accent-text" aria-hidden />
+          <div className="text-[14px] font-semibold">{t.attach.drop}</div>
+          <div className="text-[12px] text-muted">{t.attach.dropHint}</div>
         </div>
       )}
       {settings && null}

@@ -24,7 +24,7 @@ import type { VmPort } from '../shared/protocol';
 import type { Transport } from './transport/types';
 import { loadClientId, Store } from './store';
 import { DataCache } from './snapshot';
-import { uploadImage } from './images';
+import { uploadAttachment, uploadImage } from './attach';
 import { FileTransfers } from './files';
 import { createWindow, installCsp, rendererEntry, setOverlayTheme } from './window';
 import { AppTray } from './tray';
@@ -200,13 +200,17 @@ const transfers = new FileTransfers({
 /** the renderer's startup splash is up (window.ts: caption buttons match its background) */
 let splashOn = true;
 
-async function safeUpload(data: Uint8Array) {
+/** name = null: a clipboard image (images only); otherwise a dropped or picked file of any type */
+async function safeUpload(data: Uint8Array, name: string | null = null) {
   try {
-    const r = await uploadImage(conn.transport, data);
-    log('[image]', r.ok ? `uploaded ${data.length} B -> ${r.path}` : `refused: ${r.error}`);
+    const r =
+      name === null
+        ? await uploadImage(conn.transport, data)
+        : await uploadAttachment(conn.transport, name, data);
+    log('[attach]', r.ok ? `uploaded ${data.length} B -> ${r.path}` : `refused: ${r.error}`);
     return r;
   } catch (e) {
-    log('[image] upload failed:', (e as Error).message);
+    log('[attach] upload failed:', (e as Error).message);
     return { ok: false as const, error: (e as Error).message };
   }
 }
@@ -343,7 +347,7 @@ const handlers: Handlers = {
     }
     return { ok: false as const, none: true as const };
   },
-  'image.upload': ({ data }) => safeUpload(data),
+  'attach.upload': ({ name, data }) => safeUpload(data, name),
   'file.download': ({ path }) => transfers.download(path),
   'file.upload': ({ dir, name, data, overwrite }) => transfers.upload(dir, name, data, overwrite),
   'file.reveal': ({ path }) => {

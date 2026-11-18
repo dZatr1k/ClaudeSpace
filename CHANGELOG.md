@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.9
+- Attach any file to a chat, not only pictures: PDF, Markdown, text, code, archives. Drop files on the terminal, or
+  pick them with «Прикрепить» on the Claude bar, Ctrl+Shift+A, the palette or the terminal's right-click menu.
+  The file is uploaded to the VM (`~/.cache/claudespace/files/<hash>/<name>`, kept for a week) and its path is typed
+  into the prompt; Claude reads it from there. Pictures still go to `images/`, so Claude Code attaches them as before.
+  Up to 100 MB per file. The name keeps letters of any script, digits, `.`, `_` and `-`; anything else becomes `_`,
+  so the path can be pasted without quotes.
+
 ## 0.7.8
 - New port toast: no more toasts for ports the system picked at random (test runners such as vitest, helper
   servers); they still show in the Ports tab. A port is offered only after it has been listening for 5 seconds,

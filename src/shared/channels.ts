@@ -27,7 +27,7 @@ export const IPC_CHANNEL_NAMES = [
   'notify.show',
   'clipboard.read',
   'image.pasteClipboard',
-  'image.upload',
+  'attach.upload',
   'file.download',
   'file.upload',
   'file.reveal',
