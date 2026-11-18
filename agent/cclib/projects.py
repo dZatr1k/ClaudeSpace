@@ -1,4 +1,5 @@
-"""Project folders: ~/projects/* + folders of chats + ~; git summary/details; create_project."""
+"""Project folders: ~/projects/* + folders of chats + created folders + ~; git summary/details; create_project."""
+import json
 import os
 import re
 import subprocess
@@ -13,8 +14,32 @@ def run(cmd, timeout=2):
         return ''
 
 
+def created_file():
+    return os.path.join(paths.P.state, 'created-projects.json')
+
+
+def created_dirs():
+    """Folders made by create_project. Listed even when they lie outside ~/projects and have no chat yet."""
+    try:
+        with open(created_file(), encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return [d for d in data if isinstance(d, str)] if isinstance(data, list) else []
+
+
+def remember_created(rp):
+    """Add rp to created_dirs(); folders that no longer exist are dropped on the way."""
+    keep = [d for d in created_dirs() if d != rp and os.path.isdir(d)]
+    try:
+        paths.atomic_write_json(created_file(), (keep + [rp])[-200:])
+    except OSError:
+        pass    # the folder is made; it only stays out of the list until a chat is started there
+
+
 def project_dirs(chats):
-    """-> ([(dir, last_activity_sec)], {dir: last_chat_sec}), most recent first (= ccdata.project_dirs)."""
+    """-> ([(dir, last_activity_sec)], {dir: last_chat_sec}), most recent first.
+    Same as ccdata.project_dirs, plus folders made by create_project (created_dirs)."""
     P = paths.P
     last = {}
     for c in chats:
@@ -28,6 +53,9 @@ def project_dirs(chats):
                 dirs.add(e.path)
     for d in last:
         if os.path.isdir(d) and not d.startswith(P.claude_dir) and not d.startswith('/tmp'):
+            dirs.add(d)
+    for d in created_dirs():
+        if paths.within_home(d) and not paths.is_denied(d) and os.path.isdir(d):
             dirs.add(d)
     dirs.add(P.home)
     res = []
@@ -140,26 +168,47 @@ def build(chats_raw, live_by_project, git=True):
     return out
 
 
+def expand_home(path):
+    """"~" and "~/x" against the agent's home (paths.P.home, not whatever $HOME says)."""
+    if path == '~' or path.startswith('~/'):
+        return paths.P.home + path[1:]
+    return os.path.expanduser(path)
+
+
 def resolve_existing_dir(path):
     """realpath, must exist, be a directory and lie inside $HOME; else None."""
     if not isinstance(path, str) or not path or '\0' in path:
         return None
-    rp = os.path.realpath(os.path.expanduser(path))
+    rp = os.path.realpath(expand_home(path))
     if not paths.within_home(rp) or paths.is_denied(rp) or not os.path.isdir(rp):
         return None
     return rp
+
+
+def not_allowed_text(rp):
+    """Why create_project refused rp, with the real home path: the app labels ~ as "home",
+    so people type /home/<name> and expect it to be their home folder."""
+    home = paths.P.home
+    if rp == home:
+        return f'Домашняя папка уже есть в списке как home. Новый проект создайте внутри неё, например в {home}/projects.'
+    if paths.within_home(rp):
+        return f'В {paths.short_path(rp)} проект создать нельзя: приложение не трогает папки с ключами и паролями.'
+    name = os.path.basename(rp)
+    example = f' Например: {home}/projects/{name}' if name else ''
+    return f'Проект можно создать только внутри домашней папки {home}.{example}'
 
 
 def create_project(path, git_init=False):
     """-> realpath. Raises ValueError(code, message)."""
     if not isinstance(path, str) or not path.strip() or '\0' in path:
         raise ValueError('bad_request', 'пустой путь')
-    rp = os.path.realpath(os.path.expanduser(path.strip()))
+    rp = os.path.realpath(expand_home(path.strip()))
     if not paths.within_home(rp) or rp == paths.P.home or paths.is_denied(rp):
-        raise ValueError('not_allowed', 'папка должна быть внутри домашней')
+        raise ValueError('not_allowed', not_allowed_text(rp))
     if os.path.exists(rp):
         raise ValueError('exists', f'уже существует: {paths.short_path(rp)}')
     os.makedirs(rp)
+    remember_created(rp)
     if git_init:
         subprocess.run(['git', '-C', rp, 'init', '-q'], capture_output=True, timeout=10)
     return rp

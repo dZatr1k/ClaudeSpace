@@ -168,6 +168,42 @@ class ChatsTest(unittest.TestCase):
                 projects.create_project(bad)
             self.assertEqual(e.exception.args[0], code, bad)
 
+    def test_created_project_outside_projects_root_is_listed(self):
+        # a folder right in ~ with no chat yet: before, it was made but never shown in the list
+        rp = projects.create_project('~/Epsilon')
+        self.assertEqual(rp, os.path.join(self.fh.home, 'Epsilon'))
+        dirs = [d for d, _ in projects.project_dirs([])[0]]
+        self.assertIn(rp, dirs)
+        self.assertEqual(projects.display_name(rp), 'home/Epsilon')
+        os.rmdir(rp)
+        self.assertNotIn(rp, [d for d, _ in projects.project_dirs([])[0]])
+        projects.create_project('~/Zeta')                 # a deleted folder is dropped from the file on the next save
+        self.assertEqual(projects.created_dirs()[-1], os.path.join(self.fh.home, 'Zeta'))
+        self.assertNotIn(rp, projects.created_dirs())
+        os.rmdir(os.path.join(self.fh.home, 'Zeta'))
+
+    def test_created_list_ignores_bad_entries(self):
+        paths.atomic_write_json(projects.created_file(), ['/etc', os.path.join(self.fh.home, '.ssh'), 42])
+        dirs = [d for d, _ in projects.project_dirs([])[0]]
+        self.assertNotIn('/etc', dirs)
+        self.assertNotIn(os.path.join(self.fh.home, '.ssh'), dirs)
+        with open(projects.created_file(), 'w') as f:
+            f.write('{not json')
+        self.assertEqual(projects.created_dirs(), [])
+        os.remove(projects.created_file())
+
+    def test_not_allowed_names_real_home(self):
+        home = self.fh.home
+        with self.assertRaises(ValueError) as e:
+            projects.create_project('/home/x-outside-name')
+        self.assertIn(f'{home}/projects/x-outside-name', e.exception.args[1])
+        with self.assertRaises(ValueError) as e:
+            projects.create_project(home)
+        self.assertIn('home', e.exception.args[1])
+        with self.assertRaises(ValueError) as e:
+            projects.create_project(os.path.join(home, '.ssh', 'p'))
+        self.assertIn('ключами', e.exception.args[1])
+
 
 if __name__ == '__main__':
     unittest.main()

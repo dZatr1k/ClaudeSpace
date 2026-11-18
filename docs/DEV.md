@@ -70,6 +70,10 @@ VM: python3 -I ~/.local/lib/claudespace/csagent.py serve --protocol 1  (agent/cs
   `ccdata.py` без форматирования (`paths`, `chats`, `sessions`, `tmux`, `projects`, `usage`, `doctor`, `system`).
   Кэш индекса — `~/.cache/claudespace/chats.json`, псевдонимы — `~/.local/state/claudespace/titles.json`, архив —
   общий с `cc` (`~/.claude/cc-menu-archive/`).
+- **Список проектов** (`projects.project_dirs`): `~/projects/*`, папки чатов, `~` и папки, созданные через
+  «Создать проект» (`~/.local/state/claudespace/created-projects.json`; удалённые папки выпадают из списка и из файла
+  при следующем создании). `cc` знает только первые три источника, поэтому такие папки он не показывает, пока в них
+  нет чата. `~` в путях раскрывается от домашней папки агента (`expand_home`), а не от `$HOME` процесса.
 - **Безопасность агента**: аудит-хук запрещает открывать `.credentials*`, `settings.local.json`, `history.jsonl`,
   `sessions/*.key`, `~/.ssh/**` (тест `test_security.py` прогоняет все методы и проверяет журнал открытий); нет метода
   «выполнить команду»; tmux/git — списком аргументов; пути — `realpath` внутри `$HOME`; `chatId` и имена сессий —

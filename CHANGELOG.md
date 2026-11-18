@@ -4,6 +4,11 @@
 - New port toast: no more toasts for ports the system picked at random (test runners such as vitest, helper
   servers); they still show in the Ports tab. A port is offered only after it has been listening for 5 seconds,
   and the same port of a project at most once in 30 minutes, so a dev server restarting on save does not repeat it.
+- Create project: a folder made outside `~/projects` (for example `~/name`) now shows in the project list right away.
+  Before, it stayed hidden until a chat was started in it. The agent keeps such folders in
+  `~/.local/state/claudespace/created-projects.json` and drops them once they are deleted.
+- Create project: when the path is outside the home folder, the error names the real home path and suggests
+  `<home>/projects/<name>`. The app labels the home folder «home», so `/home/<name>` looked like the right place.
 
 ## 0.7.7
 - Claude settings → Plugins: a click on a plugin's skill opens it in Skills, selected, with its group opened.

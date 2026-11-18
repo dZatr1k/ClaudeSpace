@@ -216,6 +216,11 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(r['project']['path'], p)
         self.assertEqual(self.ag.call('create_project', {'path': p})['error']['code'], 'exists')
         self.ag.wait_event('projects_changed', lambda d: any(x['path'] == p for x in d['full']), timeout=40)
+        # right in ~, no chat yet: still shows up in the project list
+        q = os.path.join(self.fh.home, 'Eta')
+        r = self.ok('create_project', {'path': '~/Eta'})
+        self.assertEqual((r['project']['path'], r['project']['name']), (q, 'home/Eta'))
+        self.ag.wait_event('projects_changed', lambda d: any(x['path'] == q for x in d['full']), timeout=40)
 
     def test_resync(self):
         n = len(self.ag.events)
