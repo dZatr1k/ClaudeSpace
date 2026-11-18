@@ -159,6 +159,11 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
   событие `ports.state`. Закреплённые — `settings.ports.pinned`, тост о новом порте — `settings.ports.notifyNew`.
 - Renderer: вкладка «Порты» (`components/RightPanel/PortsPanel.tsx`), `lib/ports.ts` (открыть/пробросить + сообщения),
   `lib/portsNotify.ts` (какие новые порты показать), ссылки в xterm — `controller.ts` → `openLink`.
+- Тост о новом порте (2026-11-16, после ложных тостов «Новый порт 45687 (vitest, …)» от тестов): агент помечает
+  `ephemeral` порты из диапазона `/proc/sys/net/ipv4/ip_local_port_range` (их ядро выдаёт на `listen(0)`, так
+  работают тестовые и служебные серверы), для них тоста нет, в панели «Порты» они остаются. Остальные предлагаются,
+  только если порт прослушивается 5 с тем же процессом (`PortAnnouncer`, `SETTLE_MS`), и один раз на порт и проект
+  за 30 минут (`REOFFER_MS`), чтобы перезапуск dev-сервера при сохранении не повторял тост.
 - Тесты: `agent/tests/test_ports.py` (фикстуры `/proc/net/tcp{,6}`, имена процессов, реальный `http.server` в фейковом
   проекте, событие), `tests/unit/ports.node.test.ts` (URL, выбор порта, форвардер на фейковом транспорте),
   `tests/unit/portsNotify.web.test.ts`, `tests/integration/ports.test.ts` (direct-tcpip через in-process ssh2, обрыв и

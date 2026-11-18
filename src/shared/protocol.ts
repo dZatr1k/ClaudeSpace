@@ -272,6 +272,8 @@ export interface VmPort {
   /** ~/projects/<name> the process runs in */
   project: string | null;
   projectPath: string | null;
+  /** the kernel picked the port (listen on 0: test runners, helpers), not a dev server on a fixed port */
+  ephemeral?: boolean;
 }
 
 /** an sshfs mount inside the VM home; owned = mounted by ClaudeSpace (agent), not by hand; client = which app

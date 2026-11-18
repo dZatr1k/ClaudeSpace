@@ -137,15 +137,29 @@ def display_name(comm, argv):
 
 
 SKIP_COMM = ('sshd', 'sshd-session', 'ssh')
+EPHEMERAL_DEFAULT = (32768, 60999)
+
+
+def ephemeral_range(path='/proc/sys/net/ipv4/ip_local_port_range'):
+    """-> (lo, hi): the ports the kernel hands out for listen(0) / bind to port 0. Test runners and helper servers
+    get these; dev servers listen on a fixed port."""
+    try:
+        lo, hi = (int(x) for x in _read(path).split()[:2])
+        if 0 < lo <= hi <= 65535:
+            return lo, hi
+    except ValueError:
+        pass
+    return EPHEMERAL_DEFAULT
 
 
 class PortScanner:
     """Listening TCP ports of this user's processes (BACKLOG 10). The inode -> pid scan over /proc/*/fd runs only
     when the set of listening sockets changed; process info is cached per (pid, inode)."""
 
-    def __init__(self, home, skip_ports=()):
+    def __init__(self, home, skip_ports=(), ephemeral=None):
         self.home = home
         self.skip_ports = set(skip_ports)
+        self.ephemeral = ephemeral or ephemeral_range()
         self.cache = {}         # inode -> port dict (or None = skip)
 
     def project_of(self, cwd):
@@ -180,5 +194,6 @@ class PortScanner:
             meta = self.cache.get(r['inode'])
             if meta is None or r['port'] in by_port:
                 continue
-            by_port[r['port']] = dict(meta, port=r['port'], addr=r['addr'])
+            lo, hi = self.ephemeral
+            by_port[r['port']] = dict(meta, port=r['port'], addr=r['addr'], ephemeral=lo <= r['port'] <= hi)
         return [by_port[p] for p in sorted(by_port)]

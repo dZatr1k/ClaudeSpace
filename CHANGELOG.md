@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.8
+- New port toast: no more toasts for ports the system picked at random (test runners such as vitest, helper
+  servers); they still show in the Ports tab. A port is offered only after it has been listening for 5 seconds,
+  and the same port of a project at most once in 30 minutes, so a dev server restarting on save does not repeat it.
+
 ## 0.7.7
 - Claude settings → Plugins: a click on a plugin's skill opens it in Skills, selected, with its group opened.
 

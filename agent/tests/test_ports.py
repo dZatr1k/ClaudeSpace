@@ -1,9 +1,11 @@
 """Listening ports (BACKLOG 10): /proc/net/tcp{,6} parsing on fixture text, process names, a real scan of a server
 started in a fake project, and the ports_changed event."""
 import os
+import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -80,6 +82,28 @@ class ScanTest(unittest.TestCase):
         for x in ports.values():
             self.assertNotEqual(x['port'], 2222)
         self.assertNotIn(self.port, [x['port'] for x in netstat.PortScanner(self.fh.home, (self.port,)).scan()])
+
+    def test_ephemeral_flag(self):
+        # http.server on port 0 got a kernel-chosen port: inside the range it is marked, outside it is not
+        inside = {p['port']: p for p in netstat.PortScanner(self.fh.home, ephemeral=(self.port, self.port)).scan()}
+        self.assertIs(inside[self.port]['ephemeral'], True)
+        outside = {p['port']: p for p in netstat.PortScanner(self.fh.home, ephemeral=(1, 2)).scan()}
+        self.assertIs(outside[self.port]['ephemeral'], False)
+
+    def test_ephemeral_range_file(self):
+        d = tempfile.mkdtemp()
+        try:
+            f = os.path.join(d, 'range')
+            for text, want in (('40000\t50000\n', (40000, 50000)), ('junk', netstat.EPHEMERAL_DEFAULT),
+                               ('9 3', netstat.EPHEMERAL_DEFAULT)):
+                with open(f, 'w') as fp:
+                    fp.write(text)
+                self.assertEqual(netstat.ephemeral_range(f), want)
+            self.assertEqual(netstat.ephemeral_range(os.path.join(d, 'missing')), netstat.EPHEMERAL_DEFAULT)
+        finally:
+            shutil.rmtree(d)
+        lo, hi = netstat.ephemeral_range()
+        self.assertTrue(0 < lo <= hi <= 65535)
 
     def test_event_on_new_and_closed_port(self):
         ag = fx.AgentProc(self.fh)

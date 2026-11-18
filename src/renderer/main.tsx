@@ -21,9 +21,8 @@ import { useConn } from './stores/conn';
 import { usePcLink } from './stores/pclink';
 import { usePorts } from './stores/ports';
 import { useUpdate } from './stores/update';
-import { newProjectPorts } from './lib/portsNotify';
+import { PortAnnouncer } from './lib/portsNotify';
 import { openVmPort } from './lib/ports';
-import type { VmPort } from '@shared/protocol';
 import { useData } from './stores/data';
 import { useTabs } from './stores/tabs';
 import { defaultLayout, useUi } from './stores/ui';
@@ -60,14 +59,10 @@ async function init() {
   useUpdate.getState().set(await invoke('update.state'));
   on('update.state', (s) => useUpdate.getState().set(s));
   on('ports.state', (f) => usePorts.getState().set(f));
-  // a new dev server in a project with an open session: offer to open it (BACKLOG 10)
-  let lastPorts: VmPort[] | null = null;
-  useData.subscribe((d, p) => {
-    if (d.ports === p.ports) return;
-    const fresh = newProjectPorts(lastPorts, d.ports, d.sessions);
-    lastPorts = d.ports;
-    if (!useUi.getState().settings?.ports.notifyNew) return;
-    for (const x of fresh)
+  // a new dev server in a project with an open session: offer to open it (BACKLOG 10, lib/portsNotify.ts)
+  const announcer = new PortAnnouncer(
+    (x) => {
+      if (!useUi.getState().settings?.ports.notifyNew) return;
       useUi.getState().toast(
         t.ports.newPort(x.port, x.name ?? '?', x.project ?? ''),
         'info',
@@ -77,9 +72,14 @@ async function init() {
         },
         12000,
       );
+    },
+    () => useData.getState(),
+  );
+  useData.subscribe((d, p) => {
+    if (d.ports !== p.ports) announcer.update(d.ports, d.sessions);
   });
   useConn.subscribe((c) => {
-    if (c.state.kind !== 'online') lastPorts = null;
+    if (c.state.kind !== 'online') announcer.reset();
   });
   useUi.getState().set({ settings, appInfo });
   applyTheme();
