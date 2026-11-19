@@ -22,7 +22,7 @@ import { usePcLink } from './stores/pclink';
 import { usePorts } from './stores/ports';
 import { useUpdate } from './stores/update';
 import { PortAnnouncer } from './lib/portsNotify';
-import { openVmPort } from './lib/ports';
+import { openVmPort, wireOpenUrl } from './lib/ports';
 import { useData } from './stores/data';
 import { useTabs } from './stores/tabs';
 import { defaultLayout, useUi } from './stores/ui';
@@ -92,6 +92,7 @@ async function init() {
   wireTerminals();
   wireNotifications();
   wireAskpass();
+  wireOpenUrl();
   wireSearch();
 
   // restore layout + tmux tabs (DESIGN §4.1); temporary tabs are not restored

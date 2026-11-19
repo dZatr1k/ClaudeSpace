@@ -26,8 +26,8 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 if HERE not in sys.path:          # -I (isolated, safe-path) does not put the script dir on sys.path
     sys.path.insert(0, HERE)
 
-from cclib import (askpass, chats, claudecfg, claudeinput, doctor, files, gitview, netstat, paths,  # noqa: E402
-                   projects, search, sessions, system, tmux, turns, usage, winfs, worktrees)
+from cclib import (askpass, chats, claudecfg, claudeinput, doctor, files, gitview, netstat, openurl,  # noqa: E402
+                   paths, projects, search, sessions, system, tmux, turns, usage, winfs, worktrees)
 
 AGENT_VERSION = '0.4.0'
 PROTOCOL = 1
@@ -55,7 +55,7 @@ def now_ms():
 
 def agent_files(base=HERE):
     """Files that make up the agent (relative paths), as in MANIFEST.json."""
-    out = ['askpass.py', 'csagent.py']
+    out = ['askpass.py', 'csagent.py', 'openurl.py']
     for name in sorted(os.listdir(os.path.join(base, 'cclib'))):
         if name.endswith('.py'):
             out.append('cclib/' + name)
@@ -160,6 +160,7 @@ class Agent:
         self.port_scanner = netstat.PortScanner(paths.P.home, skip_ports=(TUNNEL_PORT,))
         self.searcher = search.Searcher(self.emit, log=log)
         self.askpass = askpass.AskpassServer(self.emit, session_of=self._session_of_pane, log=log)
+        self.openurl = openurl.OpenUrlServer(self.emit, log=log)
         self.methods = {
             'ping': self.m_ping, 'list_active': self.m_list_active, 'list_chats': self.m_list_chats,
             'list_projects': self.m_list_projects, 'list_dirs': self.m_list_dirs,
@@ -392,6 +393,7 @@ class Agent:
             if t >= self.due['askpass']:
                 self.due['askpass'] = t + POLL['askpass']
                 self.askpass.check()
+                self.openurl.check()
         except Exception:
             log('poll failed:', traceback.format_exc())
 
@@ -419,6 +421,7 @@ class Agent:
         self.due['winfs'] = time.time() + POLL['winfs']
         self.due['ports'] = time.time() + POLL['ports']
         self.due['askpass'] = time.time() + POLL['askpass']
+        self.openurl.enable(True)   # links from chats (BROWSER=openurl.py) open on the PC while the app is here
         self.pool.submit(self.emit_doctor_warning)
 
     def soon(self, *what):
@@ -914,6 +917,7 @@ class Agent:
                     self.handle_line(line.decode('utf-8', 'replace'))
         self.searcher.cancel()
         self.askpass.shutdown()     # waiting sudo prompts exit 1: nobody is there to answer them
+        self.openurl.shutdown()     # links fall back to the VM's own browser, if it has a desktop
         self.pool.shutdown(wait=True)
         try:      # the app is gone: do not leave our sshfs mounts behind a tunnel that no longer exists
             gone = winfs.cleanup()

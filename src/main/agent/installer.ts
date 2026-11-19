@@ -14,8 +14,8 @@ export interface Manifest {
 }
 
 export const REMOTE_DIR = '.local/lib/claudespace';
-/** files run directly: csagent.py by the app, askpass.py by sudo (SUDO_ASKPASS, BACKLOG 11) */
-export const EXECUTABLE_FILES: readonly string[] = ['csagent.py', 'askpass.py'];
+/** files run directly: csagent.py by the app, askpass.py by sudo (SUDO_ASKPASS, BACKLOG 11), openurl.py as BROWSER */
+export const EXECUTABLE_FILES: readonly string[] = ['csagent.py', 'askpass.py', 'openurl.py'];
 
 export function readBundledManifest(bundleDir: string): Manifest {
   return JSON.parse(readFileSync(join(bundleDir, 'MANIFEST.json'), 'utf8')) as Manifest;

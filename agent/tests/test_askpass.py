@@ -16,7 +16,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from cclib import askpass, paths  # noqa: E402
+from cclib import appsock, askpass, paths  # noqa: E402
 from tests import fixtures as fx  # noqa: E402
 
 SCRIPT = os.path.join(fx.AGENT_DIR, 'askpass.py')
@@ -187,8 +187,8 @@ class ProtocolTest(Base):
     def test_peer_uid_checked(self):
         s = self.server()
         s.enable(True)
-        real = askpass.peer_cred
-        with mock.patch.object(askpass, 'peer_cred', lambda c: (lambda p, u, g: (p, u + 1, g))(*real(c))):
+        real = appsock.peer_cred
+        with mock.patch.object(appsock, 'peer_cred', lambda c: (lambda p, u, g: (p, u + 1, g))(*real(c))):
             p = self.run_script()
             out, _ = p.communicate(timeout=10)
         self.assertEqual((p.returncode, out), (1, b''))

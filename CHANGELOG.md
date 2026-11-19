@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.10
+- A link clicked in a Claude Code chat opens in the PC's browser, and Claude Code no longer says «Couldn't open your
+  browser». Chats started by ClaudeSpace get `BROWSER` set to the agent's `openurl.py`; the script hands the link to
+  the app through the agent, and the app opens it like a click in the terminal (`localhost` through a port forward).
+  A click that reaches both the terminal and Claude Code opens one tab. Chats that were already running get this
+  after a restart. Without the app, the script falls back to `xdg-open` on the VM desktop.
+
 ## 0.7.9
 - Attach any file to a chat, not only pictures: PDF, Markdown, text, code, archives. Drop files on the terminal, or
   pick them with «Прикрепить» on the Claude bar, Ctrl+Shift+A, the palette or the terminal's right-click menu.

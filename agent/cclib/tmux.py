@@ -9,7 +9,7 @@ import shlex
 import shutil
 import subprocess
 
-from . import paths
+from . import openurl, paths
 
 NAME_RE = paths.SESSION_RE
 
@@ -137,10 +137,14 @@ def unique_name(base_dir_or_name, from_dir=True):
 
 
 def claude_command(resume=None):
-    """Shell command run inside the new tmux session (same as cc: claude [--resume id]; exec bash -l)."""
+    """Shell command run inside the new tmux session (same as cc: claude [--resume id]; exec bash -l).
+    BROWSER: a link clicked in Claude Code opens in the PC's browser through the app (cclib/openurl.py)."""
     parts = ['unset CLAUDECODE CLAUDE_CODE_ENTRYPOINT;',
-             f'export PATH={shlex.quote(paths.P.local_bin)}:"$PATH";',
-             'claude']
+             f'export PATH={shlex.quote(paths.P.local_bin)}:"$PATH";']
+    browser = openurl.script_path()
+    if browser:
+        parts.append(f'export BROWSER={shlex.quote(browser)};')
+    parts.append('claude')
     if resume:
         parts += ['--resume', shlex.quote(resume)]
     parts += [';', 'exec bash -l']

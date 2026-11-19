@@ -15,8 +15,8 @@ import csagent  # noqa: E402
 
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, 'resources', 'agent')
-# run directly: the agent by the app, askpass.py by sudo (SUDO_ASKPASS)
-EXECUTABLE = ('csagent.py', 'askpass.py')
+# run directly: the agent by the app, askpass.py by sudo (SUDO_ASKPASS), openurl.py by Claude Code (BROWSER)
+EXECUTABLE = ('csagent.py', 'askpass.py', 'openurl.py')
 
 
 def bundle(dest):
