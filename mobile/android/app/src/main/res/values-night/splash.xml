@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- bg-base of the dark theme (src/renderer/theme/tokens.css) -->
+    <color name="splash_background">#121110</color>
+</resources>

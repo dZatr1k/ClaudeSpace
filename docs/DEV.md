@@ -307,6 +307,39 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
 - Не проверено: настоящий клик в Claude Code на ПК; длинный адрес, который Claude Code перенёс на вторую строку
   (xterm может увидеть его обрезанным, и тогда откроются две вкладки).
 
+## Приложение для Android (этап 8)
+
+План и решения: [MOBILE.md](MOBILE.md). Сделан этап 1 (2026-11-19): каркас, который собирается в APK и пока только
+показывает свою версию.
+
+- **Инструменты.** JDK 21 и Android SDK (платформа 36, build-tools 35 и 36). На этой VM они стоят в
+  `~/.local/opt/jdk-21` и `~/.local/opt/android-sdk`, без sudo. `scripts/mobile.mjs` берёт их из `JAVA_HOME` и
+  `ANDROID_HOME`, а без этих переменных ищет в `~/.local/opt` и `~/Android/Sdk`.
+- **Команды.** `npm run mobile:dev` отдаёт веб-часть на `127.0.0.1:5181` (порт меняет `MOBILE_PORT`), её смотрят в
+  браузере в режиме телефона. `npm run mobile:apk` собирает веб-часть (`vite.mobile.config.ts`, в `out/mobile`),
+  копирует её в проект Android (`cap sync android`) и запускает Gradle. APK с отладочной подписью ложится в
+  `out/android/ClaudeSpace-<версия>-debug.apk`. Первая сборка скачивает Gradle и зависимости в `~/.gradle` (около
+  1 ГБ) и идёт несколько минут. Демон Gradle после локальной сборки выходит через 10 минут простоя.
+- **Что где.** Веб-часть в `src/mobile/`, цвета и шрифты общие с ПК (`src/renderer/theme/tokens.css` и
+  `theme.css`). Конфиг Capacitor в `capacitor.config.json`. Проект Android в `mobile/android/`: его создал
+  `npx cap add android` из Capacitor 8.6.0, дальше он поправлен руками. Версия берётся из `package.json` (0.7.10
+  становится versionCode 7010), Firebase и примеры тестов убраны, значки свои (`npm run icon`), стартовый экран
+  цвета фона приложения, `allowBackup="false"`, FileProvider открывает только папку снимков камеры, у дистрибутива
+  Gradle указана контрольная сумма. Файлы `capacitor.build.gradle`, `capacitor.settings.gradle`,
+  `app/src/main/assets/` и папку `capacitor-cordova-android-plugins/` Capacitor пересоздаёт при `cap sync`, их не
+  правят.
+- **Подпись** пока только отладочная. Отладочный ключ на каждой машине свой, поэтому APK из CI не встанет поверх
+  APK, собранного на VM: сначала нужно удалить старый. Ключ для релизов появится на этапе 6.
+- **CI.** Задача `android` в `ci.yml` собирает APK на каждый push в `main` и хранит его артефактом 14 дней.
+- **Телеметрия Capacitor CLI** включается сама при первом запуске `cap` в интерактивном терминале. На этой VM она
+  выключена (`npx cap telemetry off`), на новой машине это нужно сделать до первой сборки. Без терминала и в CI CLI
+  ничего не отправляет.
+- **На телефон** отладочный APK проще всего забрать из Termux: `scp <user>@<vm>:<repo>/out/android/<apk>
+  ~/storage/downloads/` (один раз перед этим `termux-setup-storage`), затем открыть файл в «Загрузках».
+- Проверено 2026-11-19: APK ставится и запускается на телефоне пользователя, экран с версией виден. Отдельно не
+  смотрели значок в лаунчере, стартовый экран и отступы под системные панели (на Android 15 и новее приложение
+  рисуется под ними, отступы задаёт `SystemBars` из Capacitor).
+
 ## Выпуск релиза
 
 1. Рабочее дерево чистое, проверки проходят (`npm run typecheck && npm run lint && npm test`).
@@ -317,7 +350,8 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
    `latest.yml` → AppImage на Ubuntu в тот же релиз. Тег должен совпадать с версией в `package.json`, иначе сборка падает.
 4. Установленные приложения увидят версию при следующей проверке (запуск или раз в 6 ч) или по кнопке.
 
-CI (`.github/workflows/ci.yml`): на push/PR в `main` — typecheck, lint, тесты агента, vitest, build (Ubuntu).
+CI (`.github/workflows/ci.yml`): на push/PR в `main` — typecheck, lint, тесты агента, vitest, build (Ubuntu) и
+отладочный APK для Android (артефакт `ClaudeSpace-android-debug`).
 
 Не проверено (только на Windows / после первого релиза): установка и SmartScreen, значок exe и ярлыков, уведомления
 с AppUserModelID `io.github.claudespace`, автозапуск из установленного приложения, полный цикл обновления

@@ -9,6 +9,7 @@
     "electron.vite.config.ts",
     "vitest.config.ts",
     "vite.splash.config.ts",
+    "vite.mobile.config.ts",
     "playwright.config.ts",
     "src/main/**/*",
     "src/preload/**/*",

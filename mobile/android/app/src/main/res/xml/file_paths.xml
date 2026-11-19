@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only what the WebView's file chooser needs: a photo taken with the camera goes to the app's own Pictures folder. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-files-path name="captures" path="Pictures/" />
+    <cache-path name="cache" path="." />
+</paths>

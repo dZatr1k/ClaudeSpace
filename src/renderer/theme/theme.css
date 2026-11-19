@@ -1,0 +1,35 @@
+/* Tailwind colour, font and shadow names for the tokens in tokens.css; shared by the desktop renderer and
+   the phone app (src/mobile). */
+@theme inline {
+  --color-base: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-hover: var(--bg-hover);
+  --color-selected: var(--bg-selected);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-control: var(--border-control);
+  --color-fg: var(--text);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-git: var(--git);
+  --color-dirty: var(--git-dirty);
+  --color-st-busy: var(--st-busy);
+  --color-st-waiting: var(--st-waiting);
+  --color-st-waiting-soft: var(--st-waiting-soft);
+  --color-st-idle: var(--st-idle);
+  --color-st-none: var(--st-none);
+  --color-st-error: var(--st-error);
+  --color-st-error-fg: var(--st-error-fg);
+  --color-st-offline: var(--st-offline);
+  --font-sans: 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+  --shadow-pop: var(--shadow-pop);
+  --shadow-modal: var(--shadow-modal);
+  /* kept for older class names */
+  --shadow-float: var(--shadow-pop);
+}
