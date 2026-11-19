@@ -1,5 +1,6 @@
 // The single connection to the VM: config -> auth -> host key -> agent, keepalive/RTT, reconnect with backoff.
 // Emits 'state' (ConnState), 'agent-event' (name, data), 'online' (transport), 'offline'.
+import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { homedir, userInfo } from 'node:os';
 import { join } from 'node:path';
@@ -53,6 +54,9 @@ export class Connection extends EventEmitter {
   transport: Transport | null = null;
   rpc: AgentRpc | null = null;
   hello: Hello | null = null;
+  /** this app on the VM for the current connection: the agent's --app and CLAUDESPACE_APP in our terminals, so that
+   * with several apps (PC, phone) a sudo prompt or a link comes to the app whose terminal it came from */
+  appId: string | null = null;
   private passphrase: string | null = null;
   private pendingHostKey: {
     host: string;
@@ -192,11 +196,13 @@ export class Connection extends EventEmitter {
       }
       this.transport = transport;
       this.setState({ kind: 'connecting', step: 'agent', attempt: this.attempt });
-      const { installed } = await ensureAgent(transport, this.deps.bundleDir, (msg) =>
+      const { installed, kept } = await ensureAgent(transport, this.deps.bundleDir, (msg) =>
         this.setState({ kind: 'connecting', step: 'agent', attempt: this.attempt, detail: msg }),
       );
       if (installed) this.log('[conn] agent installed');
-      const ch = await transport.exec(agentCommand(this.deps.settings().connection.tmuxSocket));
+      if (kept) this.log(`[conn] the agent on the VM is from a newer release (${kept}), keeping it`);
+      this.appId = randomBytes(8).toString('hex');
+      const ch = await transport.exec(agentCommand(this.deps.settings().connection.tmuxSocket, this.appId));
       const rpc = new AgentRpc(ch);
       rpc.on('log', (s: string) => this.log('[agent]', s.trimEnd()));
       // events that arrive right after hello (initial snapshots) are held until we are online

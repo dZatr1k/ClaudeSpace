@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.11
+- Several ClaudeSpace apps on one VM (the PC and, later, the phone): a sudo password prompt or a link from a chat now
+  goes to the app whose terminal it came from. Before, the app that connected last got all of them. The terminal the
+  user last typed or clicked in decides; a request from a terminal of no app (`cc` over SSH) is left to the VM, as
+  without ClaudeSpace.
+- The app no longer replaces an agent of a newer ClaudeSpace release on the VM with its own older one, so two apps
+  that update at different times do not undo each other's update. If the newer agent speaks another protocol, the
+  app asks to be updated.
+- A link clicked right after the app connects is no longer lost: the agent listens for links before it sends the
+  first lists.
+
 ## 0.7.10
 - A link clicked in a Claude Code chat opens in the PC's browser, and Claude Code no longer says «Couldn't open your
   browser». Chats started by ClaudeSpace get `BROWSER` set to the agent's `openurl.py`; the script hands the link to

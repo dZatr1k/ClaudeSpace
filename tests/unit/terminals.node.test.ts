@@ -11,6 +11,24 @@ describe('terminalCommand', () => {
       `tmux -L 'sock' -u attach-session`,
     );
   });
+  it("exports this connection's app id, so the agent can tell which app a terminal belongs to", () => {
+    const id = '0123456789abcdef';
+    for (const kind of ['tmux', 'shell'] as const) {
+      const c = terminalCommand({ tabId: 't', kind, session: 'a', cwd: '~', cols: 80, rows: 24 }, null, id);
+      expect(c).toContain(`export CLAUDESPACE_APP=${id};`);
+      expect(c.indexOf('CLAUDESPACE_APP')).toBeLessThan(c.indexOf('exec '));
+    }
+    // anything but 16 hex digits is left out, never pasted into the shell
+    const bad = terminalCommand(
+      { tabId: 't', kind: 'tmux', session: 'a', cols: 80, rows: 24 },
+      null,
+      '$(id)',
+    );
+    expect(bad).not.toContain('CLAUDESPACE_APP');
+    expect(terminalCommand({ tabId: 't', kind: 'tmux', session: 'a', cols: 80, rows: 24 })).not.toContain(
+      'CLAUDESPACE_APP',
+    );
+  });
   it('refuses bad session names', () => {
     expect(() =>
       terminalCommand({ tabId: 't', kind: 'tmux', session: "x'; rm -rf ~; '", cols: 80, rows: 24 }),

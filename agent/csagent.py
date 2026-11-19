@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """csagent — ClaudeSpace agent on the VM (Python 3.8+ stdlib only).
 
-  python3 -I csagent.py serve --protocol 1
+  python3 -I csagent.py serve --protocol 1 [--app ID]
+
+--app: the id of the app that started us (16 hex digits, new on every connection). With several apps on one VM, a sudo
+prompt or a link from a terminal goes to the app whose terminal it came from (cclib/route.py).
 
 JSON Lines over stdin/stdout (protocol: docs/DESIGN.md §7). stderr is a log. Exits on EOF of stdin.
 No "run a command" method: tmux/git are called with argument lists; paths are validated to lie in $HOME;
@@ -27,7 +30,7 @@ if HERE not in sys.path:          # -I (isolated, safe-path) does not put the sc
     sys.path.insert(0, HERE)
 
 from cclib import (askpass, chats, claudecfg, claudeinput, doctor, files, gitview, netstat, openurl,  # noqa: E402
-                   paths, projects, search, sessions, system, tmux, turns, usage, winfs, worktrees)
+                   paths, projects, route, search, sessions, system, tmux, turns, usage, winfs, worktrees)
 
 AGENT_VERSION = '0.4.0'
 PROTOCOL = 1
@@ -138,8 +141,9 @@ def p_dir(params, key):
 
 # ------------------------------------------------------------------ agent
 class Agent:
-    def __init__(self, out=None):
+    def __init__(self, out=None, app_id=None):
         self.out = out or sys.stdout.buffer
+        self.app_id = app_id
         self.out_lock = threading.Lock()
         self.state = threading.RLock()
         self.pool = ThreadPoolExecutor(max_workers=2)
@@ -159,8 +163,10 @@ class Agent:
         self.ports = None           # last listening ports list sent
         self.port_scanner = netstat.PortScanner(paths.P.home, skip_ports=(TUNNEL_PORT,))
         self.searcher = search.Searcher(self.emit, log=log)
-        self.askpass = askpass.AskpassServer(self.emit, session_of=self._session_of_pane, log=log)
-        self.openurl = openurl.OpenUrlServer(self.emit, log=log)
+        router = route.Router()
+        self.askpass = askpass.AskpassServer(self.emit, session_of=self._session_of_pane, log=log, app_id=app_id,
+                                             router=router)
+        self.openurl = openurl.OpenUrlServer(self.emit, log=log, app_id=app_id, router=router)
         self.methods = {
             'ping': self.m_ping, 'list_active': self.m_list_active, 'list_chats': self.m_list_chats,
             'list_projects': self.m_list_projects, 'list_dirs': self.m_list_dirs,
@@ -404,6 +410,9 @@ class Agent:
             log('task failed:', traceback.format_exc())
 
     def initial(self):
+        # links from chats (BROWSER=openurl.py) open on the PC while the app is here; before the first snapshots,
+        # so a link clicked right after (re)connecting is not lost
+        self.openurl.enable(True)
         self.turns.start()  # only turns finished from now on; never replay history after a (re)connect
         with self.state:
             self.refresh_procs()
@@ -421,7 +430,6 @@ class Agent:
         self.due['winfs'] = time.time() + POLL['winfs']
         self.due['ports'] = time.time() + POLL['ports']
         self.due['askpass'] = time.time() + POLL['askpass']
-        self.openurl.enable(True)   # links from chats (BROWSER=openurl.py) open on the PC while the app is here
         self.pool.submit(self.emit_doctor_warning)
 
     def soon(self, *what):
@@ -952,9 +960,15 @@ def main(argv):
             want = PROTOCOL
         if want != PROTOCOL:
             log(f'protocol {want} requested, agent speaks {PROTOCOL}')
+    app_id = None
+    if '--app' in argv:
+        i = argv.index('--app') + 1
+        app_id = argv[i] if i < len(argv) and route.valid_app(argv[i]) else None
+        if app_id is None:
+            log('--app: not a valid app id, ignored')
     paths.install_guard()
     ensure_user_path()
-    Agent().serve()
+    Agent(app_id=app_id).serve()
     return 0
 
 

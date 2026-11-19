@@ -8,46 +8,69 @@ opens it.
 - the app took it -> exit 0;
 - no socket or no app listening -> xdg-open on the VM desktop if there is one (DISPLAY/WAYLAND_DISPLAY), with BROWSER
   removed so that xdg-open does not call us again; else exit 1 and the caller says it could not open a browser.
+Several apps on this VM (the PC and the phone): the agent may answer {"status": "redirect", "app": ID}, the link
+belongs to another app, and we repeat it on that app's socket openurl.<ID>.sock (cclib/route.py decides).
 Stdlib only, no imports from the agent.
 """
 import json
 import os
+import re
 import shutil
 import socket
 import sys
 
 
-def sock_path():
+APP_ID = re.compile(r'^[0-9a-f]{16}$')
+
+
+def sock_path(name='openurl'):
     cache = os.environ.get('XDG_CACHE_HOME') or os.path.join(os.path.expanduser('~'), '.cache')
-    return os.path.join(cache, 'claudespace', 'run', 'openurl.sock')
+    return os.path.join(cache, 'claudespace', 'run', f'{name}.sock')
 
 
-def send(url):
-    """-> the agent's status: 'ok' | 'bad' | 'busy' | 'unavailable' (also: no socket, or no answer)."""
+def exchange(path, msg):
+    """One request on one socket -> the answer (a dict), or None when nobody listens there or nothing came back."""
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         s.settimeout(3)
         try:
-            s.connect(sock_path())
+            s.connect(path)
         except OSError:
-            return 'unavailable'                # no agent (never started, or a stale socket of a dead one)
-        s.sendall(json.dumps({'v': 1, 'url': url}, ensure_ascii=False).encode('utf-8') + b'\n')
+            return None                         # no agent (never started, or a stale socket of a dead one)
+        s.sendall(json.dumps(msg, ensure_ascii=False).encode('utf-8') + b'\n')
         buf = b''
         while b'\n' not in buf and len(buf) < 4096:
             try:
                 chunk = s.recv(4096)
             except OSError:
-                return 'unavailable'
+                return None
             if not chunk:
-                return 'unavailable'
+                return None
             buf += chunk
     finally:
         s.close()
     try:
         res = json.loads(buf.split(b'\n', 1)[0].decode('utf-8'))
     except ValueError:
-        return 'bad'
-    status = res.get('status') if isinstance(res, dict) else None
+        return {'status': 'bad'}
+    return res if isinstance(res, dict) else {'status': 'bad'}
+
+
+def send(url):
+    """-> the agent's status: 'ok' | 'bad' | 'busy' | 'unavailable' (also: no socket, or no answer)."""
+    msg = {'v': 1, 'url': url, 'pane': os.environ.get('TMUX_PANE') or None, 'tmux': os.environ.get('TMUX') or None,
+           'app': os.environ.get('CLAUDESPACE_APP') or None}
+    res = exchange(sock_path(), msg)
+    if res is not None and res.get('status') == 'redirect':
+        app = res.get('app')
+        if not isinstance(app, str) or not APP_ID.match(app):
+            return 'bad'
+        res = exchange(sock_path(f'openurl.{app}'), msg)
+        if res is None:                         # that app's agent is gone: the first agent answers itself
+            res = exchange(sock_path(), dict(msg, routed=True))
+    if res is None:
+        return 'unavailable'
+    status = res.get('status')
     return status if isinstance(status, str) else 'bad'
 
 

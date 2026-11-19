@@ -35,9 +35,10 @@ def version():
         return None
 
 
-def run(args, timeout=5, check=False):
+def run(args, timeout=5, check=False, base=None):
+    """tmux <args> on our server (base_cmd), or on another one: base=['tmux', '-S', path]."""
     try:
-        r = subprocess.run(base_cmd() + args, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run((base or base_cmd()) + args, capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.SubprocessError) as e:
         if check:
             raise TmuxError(str(e))

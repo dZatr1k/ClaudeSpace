@@ -81,8 +81,9 @@ class AskpassServer(appsock.AppSocket):
 
     name = 'askpass'
 
-    def __init__(self, emit, session_of=lambda pane: None, log=lambda *a: None, timeout=TIMEOUT, path=None):
-        super().__init__(log=log, path=path)
+    def __init__(self, emit, session_of=lambda pane: None, log=lambda *a: None, timeout=TIMEOUT, path=None,
+                 app_id=None, router=None):
+        super().__init__(log=log, path=path, app_id=app_id, router=router)
         self.emit = emit
         self.session_of = session_of
         self.timeout = timeout

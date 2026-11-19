@@ -8,20 +8,24 @@ unix socket (~/.cache/claudespace/run/askpass.sock, 0600, same uid only); we sen
 - answer -> password + newline on stdout, exit 0;  cancel / timeout / the app disconnected -> exit 1 (sudo aborts);
 - no socket or no app listening -> the user's own GTK prompt ~/.local/bin/sudo-askpass, if there is a desktop
   (DISPLAY/WAYLAND_DISPLAY), else exit 1.
+Several apps on this VM (the PC and the phone): the agent may answer {"status": "redirect", "app": ID}, the request
+belongs to another app, and we repeat it on that app's socket askpass.<ID>.sock (cclib/route.py decides).
 Stdlib only, no imports from the agent. The password is never written anywhere but stdout.
 """
 import json
 import os
+import re
 import socket
 import sys
 
 WAIT = 135          # the agent gives up after 120 s and tells us; this is only a safety net
 FALLBACK = os.path.join('~', '.local', 'bin', 'sudo-askpass')
+APP_ID = re.compile(r'^[0-9a-f]{16}$')
 
 
-def sock_path():
+def sock_path(name='askpass'):
     cache = os.environ.get('XDG_CACHE_HOME') or os.path.join(os.path.expanduser('~'), '.cache')
-    return os.path.join(cache, 'claudespace', 'run', 'askpass.sock')
+    return os.path.join(cache, 'claudespace', 'run', f'{name}.sock')
 
 
 def parent_cmdline():
@@ -47,15 +51,14 @@ def fallback(prompt_args):
     return 1
 
 
-def ask(prompt):
-    """-> ('ok', password) | (status, None); status 'unavailable' means: fall back."""
-    msg = {'v': 1, 'prompt': prompt, 'pane': os.environ.get('TMUX_PANE') or None,
-           'command': parent_cmdline(), 'cwd': os.getcwd() if os.path.isdir('.') else None}
+def exchange(path, msg):
+    """One request on one socket -> ('ok', answer dict) | ('unavailable', None): nobody listens there |
+    ('disconnected', None): the agent went away while we waited | ('bad', None)."""
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         s.settimeout(3)
         try:
-            s.connect(sock_path())
+            s.connect(path)
         except OSError:
             return 'unavailable', None          # no agent (never started, or a stale socket of a dead one)
         s.sendall(json.dumps(msg, ensure_ascii=False).encode('utf-8') + b'\n')
@@ -77,7 +80,25 @@ def ask(prompt):
         res = json.loads(buf.split(b'\n', 1)[0].decode('utf-8'))
     except ValueError:
         return 'bad', None
-    status = res.get('status') if isinstance(res, dict) else None
+    return ('ok', res) if isinstance(res, dict) else ('bad', None)
+
+
+def ask(prompt):
+    """-> ('ok', password) | (status, None); status 'unavailable' means: fall back."""
+    msg = {'v': 1, 'prompt': prompt, 'pane': os.environ.get('TMUX_PANE') or None,
+           'tmux': os.environ.get('TMUX') or None, 'app': os.environ.get('CLAUDESPACE_APP') or None,
+           'command': parent_cmdline(), 'cwd': os.getcwd() if os.path.isdir('.') else None}
+    st, res = exchange(sock_path(), msg)
+    if st == 'ok' and res.get('status') == 'redirect':
+        app = res.get('app')
+        if not isinstance(app, str) or not APP_ID.match(app):
+            return 'bad', None
+        st, res = exchange(sock_path(f'askpass.{app}'), msg)
+        if st == 'unavailable':                 # that app's agent is gone: the first agent answers itself
+            st, res = exchange(sock_path(), dict(msg, routed=True))
+    if st != 'ok':
+        return st, None
+    status = res.get('status')
     pw = res.get('password') if status == 'ok' else None
     if status == 'ok' and isinstance(pw, str) and '\n' not in pw:
         return 'ok', pw

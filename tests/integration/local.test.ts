@@ -1,10 +1,10 @@
 // Local transport (dev mode on the VM): installer, agent RPC, tmux terminal through the Python PTY helper.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseSettings } from '../../src/shared/settings';
 import { Connection } from '../../src/main/connection';
-import { ensureAgent, probe } from '../../src/main/agent/installer';
+import { InstallError, ensureAgent, probe } from '../../src/main/agent/installer';
 import { LocalTransport } from '../../src/main/transport/local';
 import { TerminalManager } from '../../src/main/terminals';
 import {
@@ -42,6 +42,26 @@ describe('local transport', () => {
     expect((await ensureAgent(t, BUNDLE)).installed).toBe(false);
     const m = JSON.parse(readFileSync(join(fh.home, '.local/lib/claudespace/MANIFEST.json'), 'utf8'));
     expect(m.hash).toBe(JSON.parse(readFileSync(join(BUNDLE, 'MANIFEST.json'), 'utf8')).hash);
+    t.close();
+  });
+
+  it('installer: keeps an agent of a newer release, refuses one on another protocol', async () => {
+    const t = new LocalTransport(PTY_HELPER, '/bin/bash', fh.home);
+    await ensureAgent(t, BUNDLE);
+    const path = join(fh.home, '.local/lib/claudespace/MANIFEST.json');
+    const ours = JSON.parse(readFileSync(path, 'utf8'));
+    // the phone (or the PC) updated first and put its agent here: other files, a newer release
+    writeFileSync(path, JSON.stringify({ ...ours, app: '99.0.0', hash: 'sha256:newer' }));
+    const r = await ensureAgent(t, BUNDLE);
+    expect(r).toMatchObject({ installed: false, kept: '99.0.0' });
+    expect(JSON.parse(readFileSync(path, 'utf8')).hash).toBe('sha256:newer');
+    writeFileSync(path, JSON.stringify({ ...ours, app: '99.0.0', hash: 'sha256:newer', protocol: 99 }));
+    await expect(ensureAgent(t, BUNDLE)).rejects.toMatchObject({ reason: 'newer' });
+    await expect(ensureAgent(t, BUNDLE)).rejects.toBeInstanceOf(InstallError);
+    // an older release is replaced as before
+    writeFileSync(path, JSON.stringify({ ...ours, app: '0.1.0', hash: 'sha256:older' }));
+    expect((await ensureAgent(t, BUNDLE)).installed).toBe(true);
+    expect(JSON.parse(readFileSync(path, 'utf8')).hash).toBe(ours.hash);
     t.close();
   });
 

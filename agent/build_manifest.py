@@ -19,6 +19,13 @@ OUT = os.path.join(ROOT, 'resources', 'agent')
 EXECUTABLE = ('csagent.py', 'askpass.py', 'openurl.py')
 
 
+def app_version():
+    """The app release this bundle ships with (package.json). The installer keeps an agent of a newer release
+    instead of replacing it (src/main/agent/installer.ts), so the PC and the phone do not undo each other's update."""
+    with open(os.path.join(ROOT, 'package.json'), encoding='utf-8') as f:
+        return json.load(f)['version']
+
+
 def bundle(dest):
     files = {}
     tmp = dest + '.tmp'
@@ -30,7 +37,7 @@ def bundle(dest):
         shutil.copyfile(src, dst)
         os.chmod(dst, 0o755 if rel in EXECUTABLE else 0o644)
         files[rel] = csagent.file_sha(dst)
-    manifest = {'agent': csagent.AGENT_VERSION, 'protocol': csagent.PROTOCOL, 'files': files,
+    manifest = {'agent': csagent.AGENT_VERSION, 'app': app_version(), 'protocol': csagent.PROTOCOL, 'files': files,
                 'hash': csagent.manifest_hash(files)}
     with open(os.path.join(tmp, 'MANIFEST.json'), 'w', encoding='utf-8') as f:
         json.dump(manifest, f, indent=1, sort_keys=True)
@@ -62,6 +69,7 @@ def install(src):
 
 if __name__ == '__main__':
     m = bundle(OUT)
-    print(f"agent {m['agent']} protocol {m['protocol']} {m['hash'][:19]}… -> {os.path.relpath(OUT, ROOT)}")
+    print(f"agent {m['agent']} (app {m['app']}) protocol {m['protocol']} {m['hash'][:19]}…",
+          '->', os.path.relpath(OUT, ROOT))
     if '--install' in sys.argv:
         print('installed ->', install(OUT))

@@ -2,6 +2,7 @@
 // shell/lazygit/yazi/git clone directly. Output is batched (8 ms) and flow-controlled with renderer acks.
 import type { TermOpenArgs } from '../shared/ipc';
 import { SESSION_RE } from '../shared/protocol';
+import { APP_ID_RE } from './agent/installer';
 import type { ExecChannel, Transport } from './transport/types';
 import { shq } from './transport/types';
 
@@ -9,7 +10,7 @@ export const BATCH_MS = 8;
 export const HIGH_WATER = 1024 * 1024;
 export const LOW_WATER = 256 * 1024;
 
-const PREFIX =
+const BASE_PREFIX =
   'export LANG="${LANG:-C.UTF-8}"; export PATH="$HOME/.local/bin:$PATH"; unset CLAUDECODE CLAUDE_CODE_ENTRYPOINT;';
 
 function homePath(p: string): string {
@@ -19,9 +20,18 @@ function homePath(p: string): string {
   return shq(p);
 }
 
-/** Shell command for a terminal tab (runs through the user's shell on the VM). Throws on bad input. */
-export function terminalCommand(a: TermOpenArgs, tmuxSocket: string | null = null): string {
+/**
+ * Shell command for a terminal tab (runs through the user's shell on the VM). Throws on bad input. appId: this
+ * connection's id, exported as CLAUDESPACE_APP so that the agent knows which app a tmux client or a shell belongs
+ * to (agent/cclib/route.py).
+ */
+export function terminalCommand(
+  a: TermOpenArgs,
+  tmuxSocket: string | null = null,
+  appId: string | null = null,
+): string {
   const tmux = tmuxSocket ? `tmux -L ${shq(tmuxSocket)}` : 'tmux';
+  const PREFIX = BASE_PREFIX + (appId && APP_ID_RE.test(appId) ? ` export CLAUDESPACE_APP=${appId};` : '');
   switch (a.kind) {
     case 'tmux': {
       if (!a.session || !SESSION_RE.test(a.session)) throw new Error('bad session name');
@@ -62,6 +72,7 @@ export class TerminalManager {
     private readonly sink: TerminalSink,
     private readonly getTransport: () => Transport | null,
     private readonly tmuxSocket: () => string | null = () => null,
+    private readonly appId: () => string | null = () => null,
   ) {}
 
   has(tabId: string): boolean {
@@ -72,7 +83,7 @@ export class TerminalManager {
     const t = this.getTransport();
     if (!t) throw new Error('нет связи с VM');
     this.close(a.tabId);
-    const cmd = terminalCommand(a, this.tmuxSocket());
+    const cmd = terminalCommand(a, this.tmuxSocket(), this.appId());
     const ch = await t.exec(cmd, { pty: { cols: a.cols, rows: a.rows, term: 'xterm-256color' } });
     const term: Term = { ch, pending: [], pendingBytes: 0, timer: null, unacked: 0, paused: false };
     this.terms.set(a.tabId, term);

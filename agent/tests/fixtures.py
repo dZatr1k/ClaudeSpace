@@ -155,8 +155,9 @@ def kill_tmux_server():
 class AgentProc:
     """csagent serve in a subprocess. AUDIT: record every attempted open() into a file."""
 
-    def __init__(self, fh, audit_log=None, env=None):
+    def __init__(self, fh, audit_log=None, env=None, args=()):
         self.fh = fh
+        args = list(args)
         if audit_log:
             code = (
                 'import sys, runpy\n'
@@ -165,11 +166,11 @@ class AgentProc:
                 '    if ev in ("open", "os.listdir", "os.scandir") and args and isinstance(args[0], (str, bytes)):\n'
                 '        _log.write(repr(args[0]) + "\\n")\n'
                 'sys.addaudithook(_rec)\n'
-                f'sys.argv = [{CSAGENT!r}, "serve", "--protocol", "1"]\n'
+                f'sys.argv = [{CSAGENT!r}, "serve", "--protocol", "1"] + {args!r}\n'
                 f'runpy.run_path({CSAGENT!r}, run_name="__main__")\n')
             cmd = [sys.executable, '-I', '-c', code]
         else:
-            cmd = [sys.executable, '-I', CSAGENT, 'serve', '--protocol', '1']
+            cmd = [sys.executable, '-I', CSAGENT, 'serve', '--protocol', '1'] + args
         self.p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   env=dict(fh.env(), **(env or {})), cwd=fh.home)
         self.q = queue.Queue()

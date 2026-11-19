@@ -46,8 +46,8 @@ class OpenUrlServer(appsock.AppSocket):
 
     name = 'openurl'
 
-    def __init__(self, emit, log=lambda *a: None, path=None, clock=time.monotonic):
-        super().__init__(log=log, path=path)
+    def __init__(self, emit, log=lambda *a: None, path=None, clock=time.monotonic, app_id=None, router=None):
+        super().__init__(log=log, path=path, app_id=app_id, router=router)
         self.emit = emit
         self.clock = clock
         self.recent = []            # times of the last links, for BURST

@@ -83,6 +83,7 @@ const terminals = new TerminalManager(
   },
   () => conn.transport,
   () => store.settings.connection.tmuxSocket,
+  () => conn.appId,
 );
 
 const pclink = new PcLink({
