@@ -37,7 +37,7 @@
     "release": "node scripts/release.mjs",
     "icon": "python3 scripts/make-icon.py",
     "splash": "vite --config vite.splash.config.ts",
-    "mobile:dev": "vite --config vite.mobile.config.ts",
+    "mobile:dev": "npm run agent:manifest && vite --config vite.mobile.config.ts",
     "mobile:web": "vite build --config vite.mobile.config.ts",
     "mobile:apk": "node scripts/mobile.mjs apk",
     "mobile:core": "node scripts/mobile.mjs core"
