@@ -39,7 +39,8 @@
     "splash": "vite --config vite.splash.config.ts",
     "mobile:dev": "vite --config vite.mobile.config.ts",
     "mobile:web": "vite build --config vite.mobile.config.ts",
-    "mobile:apk": "node scripts/mobile.mjs"
+    "mobile:apk": "node scripts/mobile.mjs apk",
+    "mobile:core": "node scripts/mobile.mjs core"
   },
   "devDependencies": {
     "@capacitor/android": "8.6.0",

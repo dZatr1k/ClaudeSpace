@@ -16,14 +16,16 @@ Electron-приложение для Windows, через которое рабо
 | `npm run test:e2e` | Playwright `_electron`, снимки в `docs/screenshots/`; нужны X-дисплей и свежий `out/` (`npm run build`) |
 | `npm run splash` | загрузочный экран отдельно от приложения, `127.0.0.1:5180` |
 | `npm run release -- X.Y.Z` | версия в `package.json`, коммит `Release vX.Y.Z` и тег; ничего не пушит |
+| `npm run mobile:core` | тесты ядра телефона на Kotlin (`mobile/core`) на JVM: настоящий агент за встроенным SSH-сервером; нужен JDK 21 |
 | `npm run mobile:dev`, `npm run mobile:apk` | приложение для Android ([docs/MOBILE.md](docs/MOBILE.md)): веб-часть в браузере на `127.0.0.1:5181`; отладочный APK в `out/android/` (нужны JDK 21 и Android SDK, `docs/DEV.md`) |
 
 ## Перед тем как сдать работу
 
-- Проходят `npm run typecheck && npm run lint && npm test`.
+- Проходят `npm run typecheck && npm run lint && npm test`. Если менялись агент или `mobile/core`, ещё
+  `npm run mobile:core`: ядро телефона ставит того же агента.
 - Если менялся интерфейс, прогнать e2e и посмотреть снимки в обеих темах.
 - Новое поведение покрыть тестом рядом с похожими: агент в `agent/tests/`, логика в `tests/unit/`, связка main и
-  агента в `tests/integration/`, сценарий в окне в `tests/e2e/`.
+  агента в `tests/integration/`, сценарий в окне в `tests/e2e/`, ядро телефона в `mobile/core/src/test/`.
 - Документацию обновлять в том же коммите: `CHANGELOG.md` (раздел следующей версии), `docs/DEV.md` (как устроено,
   что не проверено), `docs/BACKLOG.md`, если задача оттуда.
 

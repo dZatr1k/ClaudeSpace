@@ -4,7 +4,7 @@ const tseslint = require('typescript-eslint');
 const reactHooks = require('eslint-plugin-react-hooks');
 
 module.exports = tseslint.config(
-  { ignores: ['out/**', 'dist/**', 'release/**', 'node_modules/**', 'resources/**', 'agent/**', 'test-results/**', 'tests/e2e/.tmp/**', 'mobile/android/**'] },
+  { ignores: ['out/**', 'dist/**', 'release/**', 'node_modules/**', 'resources/**', 'agent/**', 'test-results/**', 'tests/e2e/.tmp/**', 'mobile/android/**', 'mobile/core/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

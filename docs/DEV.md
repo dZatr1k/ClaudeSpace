@@ -34,6 +34,7 @@ npm run dev:vm              # на этой VM (Electron с --no-sandbox, см. 
 | `npm run test:agent` | агент: unittest (stdlib), фейковый HOME, реальный tmux на отдельном сокете `claudespace-test-py-*` | 90 |
 | `npm run test:unit` | vitest: unit (hostkey, rpc, keymap, format, stores, terminals, settings, ports, askpass, search, tray…) + integration | 110 |
 | `npm test` | оба набора | 200 |
+| `npm run mobile:core` | ядро приложения для телефона на Kotlin (`mobile/core`) на JVM: юнит-тесты и настоящий агент за встроенным SSH-сервером MINA SSHD; нужен JDK 21 | 37 |
 | `npm run test:e2e` | Playwright `_electron`: окно, сайдбар, терминал, палитра, оверлеи, пароль sudo, поиск по чатам, закрытие в трей, обрыв, перезапуск; скриншоты в `docs/screenshots/`, включая узкое окно 960×600 и светлую тему (собирает `out/`: сначала `npm run build`) | 1 сценарий |
 | `npm run lint`, `npm run typecheck` | ESLint + Prettier, `tsc` strict для main/preload/shared и renderer | |
 
@@ -338,19 +339,21 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
   релиза не менялся, поэтому сравнивается именно `app`.
 - Сокет ссылок агент теперь включает до первых снимков, а не после: ссылка, по которой кликнули сразу после
   подключения, не теряется.
-- Ядро приложения для телефона должно делать то же самое: передавать агенту `--app` и экспортировать
-  `CLAUDESPACE_APP` в своих терминалах (`docs/MOBILE.md`, этап 3).
+- Ядро приложения для телефона делает то же самое: передаёт агенту `--app` и экспортирует `CLAUDESPACE_APP` в своих
+  терминалах (`mobile/core`, раздел «Ядро на Kotlin»).
 - Тесты: `agent/tests/test_route.py` (решение маршрутизатора; перенаправление между двумя серверами настоящими
   скриптами, включая askpass, «ни одно приложение», пропавшее и выключенное приложение; настоящие клиенты tmux через
   pty с `CLAUDESPACE_APP` и без; два процесса агента), `tests/unit/installer.node.test.ts`,
   `tests/unit/terminals.node.test.ts`, `tests/integration/local.test.ts` (более новый агент остаётся, другой протокол
   отклоняется, старый заменяется).
-- Не проверено: ПК и телефон вместе на настоящей VM. До этапов 3–5 приложение для телефона к VM не подключается.
+- Не проверено: ПК и телефон вместе на настоящей VM. Пока нет этапов 4 и 5, приложение для телефона к VM не
+  подключается.
 
 ## Приложение для Android (этап 8)
 
 План и решения: [MOBILE.md](MOBILE.md). Сделан этап 1 (2026-11-19): каркас, который собирается в APK и пока только
-показывает свою версию.
+показывает свою версию. Этап 3 (2026-11-20): ядро на Kotlin в `mobile/core`, в APK оно пока не входит (раздел
+«Ядро на Kotlin» ниже).
 
 - **Инструменты.** JDK 21 и Android SDK (платформа 36, build-tools 35 и 36). На этой VM они стоят в
   `~/.local/opt/jdk-21` и `~/.local/opt/android-sdk`, без sudo. `scripts/mobile.mjs` берёт их из `JAVA_HOME` и
@@ -368,6 +371,8 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
   Gradle указана контрольная сумма. Файлы `capacitor.build.gradle`, `capacitor.settings.gradle`,
   `app/src/main/assets/` и папку `capacitor-cordova-android-plugins/` Capacitor пересоздаёт при `cap sync`, их не
   правят.
+- **Android 8 и новее** (`minSdkVersion = 26` в `mobile/android/variables.gradle`, у Capacitor по умолчанию 24): sshj
+  разбирает ключи через `java.util.Base64`, которого нет в Android 7.
 - **Подпись** пока только отладочная. Отладочный ключ на каждой машине свой, поэтому APK из CI не встанет поверх
   APK, собранного на VM: сначала нужно удалить старый. Ключ для релизов появится на этапе 6.
 - **CI.** Задача `android` в `ci.yml` собирает APK на каждый push в `main` и хранит его артефактом 14 дней.
@@ -379,6 +384,38 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
 - Проверено 2026-11-19: APK ставится и запускается на телефоне пользователя, экран с версией виден. Отдельно не
   смотрели значок в лаунчере, стартовый экран и отступы под системные панели (на Android 15 и новее приложение
   рисуется под ними, отступы задаёт `SystemBars` из Capacitor).
+
+### Ядро на Kotlin (этап 8, шаг 3, 2026-11-20)
+
+Ядро повторяет main с ПК: подключение по SSH, проверку ключа сервера, установку агента, канал агента, терминалы и
+переподключение. Это отдельная сборка Gradle в `mobile/core` (Kotlin 2.4, байткод Java 17), Android ей не нужен.
+Своей обёртки Gradle у неё нет: `npm run mobile:core` запускает `mobile/android/gradlew -p mobile/core test`. Первый
+запуск скачивает Kotlin и зависимости в `~/.gradle`. Служба Android подключит ядро как included build на этапе 5.
+
+| Файл | Что делает | На ПК |
+|---|---|---|
+| `Connection.kt` | цикл подключения в корутине: настройки, SSH, ключ сервера, агент, online; ping агента раз в `keepaliveSec`, без ответа за три интервала соединение рвётся; повтор через 1/2/4/8/16/30 с ±20 %. `stop()` не блокирует, каналы закрываются в фоне | `connection.ts` |
+| `ConnState.kt` | состояния; `toJson()` даёт ту же форму, что `ConnState` в `src/shared/model.ts`, чтобы интерфейс остался общим | `shared/model.ts` |
+| `SshTransport.kt` | sshj. Канал читают два потока, `pause()` останавливает чтение: окно SSH заполняется, и удалённая сторона ждёт. `installSecurity()` ставит полный BouncyCastle вместо урезанного провайдера «BC» в Android | `transport/ssh.ts` |
+| `SshKey.kt` | ключ ed25519 приложения в формате OpenSSH (openssh-key-v1 без шифрования), тот же текст читает `ssh-keygen`. Шифровать его на телефоне через Android Keystore будет служба (этап 5) | `ssh/auth.ts` |
+| `KnownHosts.kt` | свой known_hosts приложения (TOFU), разбор как на ПК; изменённый ключ не добавляется никогда | `ssh/hostkey.ts` |
+| `Installer.kt` | `probe`, `installPlan`, загрузка по SFTP, проверка sha256 на VM, замена папки. Бандл агента задаёт `AgentBundle`: в тестах это папка, в APK будут assets | `agent/installer.ts` |
+| `AgentRpc.kt` | JSON Lines: запросы по id с таймаутом, события. Методов агента ядро не разбирает, параметры и результаты проходят как JSON | `agent/rpc.ts` |
+| `Terminals.kt` | команды терминалов с `CLAUDESPACE_APP`, пачки по 8 мс, пауза после 1 МБ без подтверждений | `terminals.ts` |
+
+- **Тесты** в `mobile/core/src/test/`. Юнит-тесты повторяют случаи `hostkey`, `installer`, `terminals` и `rpc` с ПК,
+  ключ проверяется настоящим `ssh-keygen` в обе стороны. Интеграционные (`SshIntegrationTest`, `SshFailuresTest`)
+  поднимают Apache MINA SSHD на `127.0.0.1` в фейковом HOME из `agent/tests/fixtures.py`: команды идут через bash,
+  PTY даёт `resources/ptyhelper.py` (размер окна приходит ему через FIFO на fd 3), SFTP работает поверх того же HOME.
+  Проверяются TOFU, установка по SFTP с правами файлов, повторное подключение без переустановки, более новый агент
+  остаётся, агент на другом протоколе просит обновить приложение, `--app` у агента и `CLAUDESPACE_APP` у клиента tmux,
+  ресайз и отсоединение, поток без подтверждений, обрыв сети, зависший агент (SIGSTOP), чужой ключ, VM без tmux.
+- Бандл агента для тестов собирается в `mobile/core/build/agent-bundle` (`build_manifest.py --out`), а не в
+  `resources/agent`: иначе тесты ядра и vitest переписывали бы одну папку одновременно. tmux работает на сокете
+  `claudespace-test-kt-<pid>`, `~/.ssh` и установленный агент тесты не трогают.
+- Для тестов нужны JDK 21, python3, tmux, `ssh-keygen` и git. В CI они идут в задаче `android` перед сборкой APK.
+- Не проверено: ядро внутри приложения на Android (замена провайдера BouncyCastle, sshj в процессе приложения) и
+  подключение к настоящему OpenSSH: тесты подключаются к MINA SSHD. Это проверится на телефоне на этапе 5.
 
 ## Выпуск релиза
 

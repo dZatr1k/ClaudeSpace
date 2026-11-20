@@ -1,5 +1,6 @@
 # Checks on every push/PR to main: typecheck, lint, agent tests (python + tmux), vitest, build. No e2e (needs a display).
-# The Android job builds the debug APK of the phone app (docs/MOBILE.md) and keeps it as an artifact for 14 days.
+# The Android job tests the phone app's Kotlin core against the real agent (mobile/core), builds the debug APK
+# (docs/MOBILE.md) and keeps it as an artifact for 14 days.
 name: CI
 
 on:
@@ -39,7 +40,7 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,7 +53,11 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: gradle
+      # the core's tests run the real agent behind an in-process SSH server: python3, tmux, ssh-keygen, git
+      - name: tmux for the core tests
+        run: command -v tmux || (sudo apt-get update && sudo apt-get install -y tmux)
       - run: npm ci
+      - run: npm run mobile:core
       - run: npm run mobile:apk
       - uses: actions/upload-artifact@v4
         with:

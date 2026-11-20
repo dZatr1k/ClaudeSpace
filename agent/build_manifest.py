@@ -3,6 +3,7 @@
 
   python3 agent/build_manifest.py            bundle into resources/agent (used by the app and the installer)
   python3 agent/build_manifest.py --install  also install into ~/.local/lib/claudespace (dev, same as the app does)
+  python3 agent/build_manifest.py --out DIR  bundle into DIR instead (the phone core's tests, mobile/core)
 """
 import json
 import os
@@ -68,8 +69,11 @@ def install(src):
 
 
 if __name__ == '__main__':
-    m = bundle(OUT)
+    out = OUT
+    if '--out' in sys.argv:
+        out = os.path.abspath(sys.argv[sys.argv.index('--out') + 1])
+    m = bundle(out)
     print(f"agent {m['agent']} (app {m['app']}) protocol {m['protocol']} {m['hash'][:19]}…",
-          '->', os.path.relpath(OUT, ROOT))
+          '->', os.path.relpath(out, ROOT))
     if '--install' in sys.argv:
-        print('installed ->', install(OUT))
+        print('installed ->', install(out))

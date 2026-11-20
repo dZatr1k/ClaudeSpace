@@ -1,0 +1,4 @@
+# Gradle and Kotlin build output (the core is built with mobile/android/gradlew -p mobile/core)
+/build/
+/.gradle/
+/.kotlin/
