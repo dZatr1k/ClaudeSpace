@@ -45,6 +45,7 @@ SLOW = {'usage', 'doctor', 'system', 'project_preview', 'session_preview', 'mosh
         'usage_report'}
 TUNNEL_PORT = 2222
 CLAUDE_ACTION_RE = re.compile(r'^(interrupt|compact|clear|model)$')
+SCROLL_RE = re.compile(r'^(up|down|cancel)$')
 CLAUDE_MODEL_RE = re.compile(r'^(default|opus|sonnet|haiku|opusplan|sonnet\[1m\])$')
 
 
@@ -188,6 +189,7 @@ class Agent:
             'git_status': self.m_git_status, 'git_diff': self.m_git_diff, 'git_log': self.m_git_log,
             'git_show': self.m_git_show,
             'claude_send': self.m_claude_send, 'usage_report': self.m_usage_report,
+            'pane_scroll': self.m_pane_scroll,
             'git_worktrees': self.m_git_worktrees, 'worktree_create': self.m_worktree_create,
             'worktree_remove': self.m_worktree_remove,
             'claude_config': self.m_claude_config, 'claude_doc_write': self.m_claude_doc_write,
@@ -604,6 +606,18 @@ class Agent:
             raise AgentError('not_found', f'сессии «{name}» нет', {'session': name})
         tmux.select_window(name, window)
         return {}
+
+    def m_pane_scroll(self, p):
+        """The phone scrolls a session's history (tmux copy-mode); a fixed set of tmux commands, no free text."""
+        name = p_session(p)
+        action = p_str(p, 'action', pattern=SCROLL_RE)
+        lines = p_int(p, 'lines', 1, 1, 500)
+        if not tmux.has_session(name):
+            raise AgentError('not_found', f'сессии «{name}» нет', {'session': name})
+        try:
+            return {'inMode': tmux.scroll(name, action, lines)}
+        except tmux.TmuxError as e:
+            raise AgentError('internal', f'tmux: {e}')
 
     def m_claude_send(self, p):
         """Quick actions for a running chat: a fixed command typed into the pane where that Claude runs (not the

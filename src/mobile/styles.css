@@ -71,14 +71,16 @@ body {
   flex-shrink: 0;
 }
 
-/* Edge to edge on Android 15+: Capacitor's SystemBars sets --safe-area-inset-* (and env() on newer WebViews).
+/* System bars: Capacitor's SystemBars puts the real insets into --safe-area-inset-* when the page draws under the bars
+   (Android 15+ with a recent WebView) and zeros when it pads the window itself. env() is not used: older WebViews report
+   the insets there too, and the space was added twice (empty strips above and below on a phone with Android 14).
    Only the insets: put content padding on an inner element, since this unlayered rule overrides utilities. */
 .safe {
   box-sizing: border-box;
-  padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
-  padding-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
-  padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  padding-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  padding-top: var(--safe-area-inset-top, 0px);
+  padding-right: var(--safe-area-inset-right, 0px);
+  padding-bottom: var(--safe-area-inset-bottom, 0px);
+  padding-left: var(--safe-area-inset-left, 0px);
 }
 
 /* the terminal fills its box; tmux's status line rows are clipped by terminal.ts */

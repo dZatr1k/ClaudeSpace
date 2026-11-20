@@ -62,7 +62,11 @@ class CoreService : Service() {
             override fun state(s: ConnState) = updateLink(s)
 
             override fun turn(t: TurnDone) {
-                notices.notice(t, appVisible, core.chatProject(t.chatId))?.let { Notifications.turn(this@CoreService, it) }
+                val n = notices.notice(t, appVisible, core.chatProject(t.chatId))
+                when {
+                    n == null -> core.note("[app] turn ${t.kind} ${t.session ?: "-"}: the app is open, no notification")
+                    else -> core.note("[app] turn ${t.kind} ${t.session ?: "-"}: ${Notifications.turn(this@CoreService, n)}")
+                }
             }
 
             override fun settings(s: PhoneSettings) = applyBackground(s)
@@ -96,9 +100,10 @@ class CoreService : Service() {
                 if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0,
             )
             foreground = true
+            core.note("[app] background connection on (foreground service)")
         } catch (e: Exception) {
             // Android refuses a foreground start from the background (a restart after the system killed us)
-            Log.w("ClaudeSpace", "foreground start refused: $e")
+            core.note("[app] foreground service refused: $e")
             stopSelf()
         }
     }
@@ -110,6 +115,7 @@ class CoreService : Service() {
         } else if (foreground) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             foreground = false
+            core.note("[app] background connection off")
             stopSelf()
         }
     }

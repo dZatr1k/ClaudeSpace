@@ -23,7 +23,8 @@ export const MOBILE_FONT_MAX = 18;
 
 export const defaultMobileSettings = (): MobileSettings => ({
   connection: { host: '', port: 22, user: '' },
-  appearance: { theme: 'system', fontSize: 12 },
+  // dark by default: the terminal is dark, a light page around it looked out of place on the phone
+  appearance: { theme: 'dark', fontSize: 12 },
   notifications: { background: true },
 });
 
@@ -88,6 +89,12 @@ export type MobileContract = Same<
   'events.replay': { args: undefined; result: { event: string; data: unknown }[] };
   /** Android's notification permission; request: ask the user if not decided yet */
   'notify.permission': { args: { request: boolean }; result: NotifyPermission };
+  /** Android's notification settings of the app (after the permission was refused) */
+  'notify.openSettings': { args: undefined; result: void };
+  /** the theme the UI shows: the system bars and the window behind the page follow it */
+  'ui.theme': { args: { dark: boolean; background: string }; result: void };
+  /** the core's recent log lines (connection steps, the agent's messages), for «Журнал» in Settings */
+  'log.get': { args: undefined; result: string[] };
 };
 
 export type NotifyPermission = 'granted' | 'denied' | 'prompt';

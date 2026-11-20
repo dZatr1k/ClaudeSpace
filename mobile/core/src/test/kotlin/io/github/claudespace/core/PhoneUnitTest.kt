@@ -16,7 +16,7 @@ class PhoneUnitTest {
     @Test
     fun `settings json has the shape of MobileSettings and defaults like the desktop's`() {
         assertEquals(
-            """{"connection":{"host":"","port":22,"user":""},"appearance":{"theme":"system","fontSize":12},"notifications":{"background":true}}""",
+            """{"connection":{"host":"","port":22,"user":""},"appearance":{"theme":"dark","fontSize":12},"notifications":{"background":true}}""",
             PhoneSettings().toJson().toString(),
         )
     }
@@ -29,7 +29,7 @@ class PhoneUnitTest {
         assertEquals(2222, s.merge(patch("""{"connection":{"port":0}}""")).port)
         assertEquals(2222, s.merge(patch("""{"connection":{"port":"22"}}""")).port)
         assertEquals(12, s.merge(patch("""{"appearance":{"fontSize":99}}""")).fontSize)
-        assertEquals("system", s.merge(patch("""{"appearance":{"theme":"neon"}}""")).theme)
+        assertEquals("dark", s.merge(patch("""{"appearance":{"theme":"neon"}}""")).theme)
         assertEquals(false, s.merge(patch("""{"notifications":{"background":false}}""")).background)
         assertEquals(true, s.merge(patch("""{"notifications":{"background":"no"}}""")).background)
         assertEquals(false, PhoneSettings(host = "vm").configured)
@@ -45,6 +45,12 @@ class PhoneUnitTest {
             assertEquals(s, PhoneSettings.load(f))
             f.writeText("{not json")
             assertEquals(PhoneSettings(), PhoneSettings.load(f))
+            // a file from before the dark default (no "v"): «system» was the default then, it becomes dark
+            f.writeText("""{"connection":{"host":"vm","user":"dev"},"appearance":{"theme":"system"}}""")
+            assertEquals("dark", PhoneSettings.load(f).theme)
+            // a choice saved since stays
+            PhoneSettings(theme = "system").save(f)
+            assertEquals("system", PhoneSettings.load(f).theme)
         } finally {
             dir.deleteRecursively()
         }

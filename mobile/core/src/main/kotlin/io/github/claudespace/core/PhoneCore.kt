@@ -50,6 +50,8 @@ fun methodTimeout(m: String): Long = when (m) {
     else -> 10_000
 }
 
+private const val JOURNAL_LINES = 400
+
 class PhoneCore(
     private val dataDir: File,
     private val bundle: AgentBundle,
@@ -63,6 +65,7 @@ class PhoneCore(
         private set
     val key: SshKey by lazy { vault.loadOrCreate() }
     private val knownHosts = File(dataDir, "known_hosts")
+    private val journal = ArrayDeque<String>()
     private val latest = LinkedHashMap<String, JsonElement>()
     private val chats = LinkedHashMap<String, JsonElement>()
 
@@ -77,9 +80,7 @@ class PhoneCore(
             override fun state(s: ConnState) = pushState()
             override fun event(name: String, data: JsonElement) = onAgentEvent(name, data)
             override fun offline() = terminals.dropAll()
-            override fun log(line: String) {
-                events?.log(line)
-            }
+            override fun log(line: String) = note(line)
         },
         connector = connector,
     )
@@ -105,6 +106,19 @@ class PhoneCore(
         tmuxSocket = { tmuxSocket },
         appId = { connection.appId },
     )
+
+    /**
+     * A line for the journal the UI shows (Settings, «Журнал»): connection steps, the agent's messages, what the service
+     * did. The last few hundred lines in memory only; they hold paths and host names, never key material.
+     */
+    fun note(line: String) {
+        val stamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date())
+        synchronized(journal) {
+            journal.addLast("$stamp $line")
+            while (journal.size > JOURNAL_LINES) journal.removeFirst()
+        }
+        events?.log(line)
+    }
 
     /** what the UI shows: like the browser dev core, nothing starts until a host and a user are set */
     fun state(): ConnState =
@@ -202,6 +216,7 @@ class PhoneCore(
                 put("fingerprint", JsonPrimitive(key.fingerprint))
             }
             "events.replay" -> replay()
+            "log.get" -> synchronized(journal) { JsonArray(journal.map { JsonPrimitive(it) }) }
             "term.open" -> openTerminal(a)
             "term.write" -> {
                 val tabId = str("tabId") ?: throw IllegalArgumentException("tabId")

@@ -1,12 +1,12 @@
 // Settings: the connection (saving reconnects), the phone key, the theme and the terminal font.
-import { ChevronLeft, Minus, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Minus, Plus, ScrollText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { MOBILE_FONT_MAX, MOBILE_FONT_MIN } from '@shared/mobile';
 import type { MobileSettings, NotifyPermission } from '@shared/mobile';
 import { useData } from '../../renderer/stores/data';
 import { invoke } from '../bridge';
 import { m } from '../strings';
-import { back, useApp } from '../store';
+import { back, go, useApp } from '../store';
 import { Button, IconButton, KeyBlock, SectionTitle } from '../ui';
 import { SetupForm } from './Connect';
 
@@ -56,9 +56,13 @@ function Background({ on }: { on: boolean }) {
           <p className="text-[14px] leading-snug">
             {perm === 'denied' ? m.settings.permissionDenied : m.settings.permissionPrompt}
           </p>
-          {perm === 'prompt' && (
+          {perm === 'prompt' ? (
             <Button className="mt-2 w-full" onClick={ask}>
               {m.settings.permissionAsk}
+            </Button>
+          ) : (
+            <Button className="mt-2 w-full" onClick={() => void invoke('notify.openSettings')}>
+              {m.settings.permissionSettings}
             </Button>
           )}
         </div>
@@ -149,6 +153,18 @@ export function Settings() {
             <p>{m.settings.version(__APP_VERSION__)}</p>
             {agentVersion && <p className="mt-1">{m.settings.agent(agentVersion)}</p>}
           </div>
+          <button
+            type="button"
+            onClick={() => go({ kind: 'log' })}
+            className="mt-3 flex min-h-12 w-full items-center gap-3 px-4 text-left active:bg-selected"
+          >
+            <ScrollText size={18} strokeWidth={1.75} className="shrink-0 text-faint" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px]">{m.settings.journal}</span>
+              <span className="block text-[13px] text-muted">{m.settings.journalHint}</span>
+            </span>
+            <ChevronRight size={18} className="text-faint" aria-hidden />
+          </button>
         </div>
       </main>
     </div>

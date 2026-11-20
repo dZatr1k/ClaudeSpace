@@ -61,10 +61,10 @@ object Notifications {
         .setContentIntent(open(ctx, null, null, 0))
         .build()
 
-    /** a turn of Claude; a newer one for the same chat replaces it */
-    fun turn(ctx: Context, n: Notice) {
+    /** a turn of Claude; a newer one for the same chat replaces it. Returns what happened, for the journal. */
+    fun turn(ctx: Context, n: Notice): String {
         val nm = NotificationManagerCompat.from(ctx)
-        if (!nm.areNotificationsEnabled()) return
+        if (!nm.areNotificationsEnabled()) return "notifications are off for the app"
         val id = 1000 + ((n.session ?: n.chatId ?: "").hashCode() and 0xffff)
         val b = NotificationCompat.Builder(ctx, CHANNEL_CLAUDE)
             .setSmallIcon(R.drawable.ic_stat_diamond)
@@ -76,10 +76,11 @@ object Notifications {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(open(ctx, n.session, n.chatId, id))
             .build()
-        try {
+        return try {
             nm.notify(id, b)
-        } catch (_: SecurityException) {
-            // the permission was taken away meanwhile
+            "notification shown"
+        } catch (e: SecurityException) {
+            "no permission to notify: $e"
         }
     }
 }

@@ -92,3 +92,41 @@ export function pasteSeq(text: string, bracketed: boolean): string {
   // a paste-end marker inside the text would end the paste early
   return '\x1b[200~' + body.split('\x1b[200~').join('').split('\x1b[201~').join('') + '\x1b[201~';
 }
+
+export interface MenuOption {
+  n: number;
+  label: string;
+  selected: boolean;
+}
+
+const OPTION_RE = /^\s*([❯›>])?\s*(\d{1,2})\.\s+(.+?)\s*$/;
+
+/**
+ * The numbered menu Claude Code shows on screen (a permission prompt, a question with options), read from the
+ * terminal's visible lines. A menu always has the pointer «❯» on one option: that tells it from a numbered list in an
+ * answer. Lines between options (descriptions) are allowed. The last menu on screen wins; none: [].
+ */
+export function menuOptions(lines: string[]): MenuOption[] {
+  let best: MenuOption[] = [];
+  let cur: MenuOption[] = [];
+  const close = () => {
+    if (cur.length >= 2 && cur.some((o) => o.selected)) best = cur;
+    cur = [];
+  };
+  for (const line of lines) {
+    const m = OPTION_RE.exec(line);
+    if (!m) continue;
+    const n = Number(m[2]);
+    const label = (m[3] as string).replace(/\s*\(esc\)$/, '');
+    if (n === 1) {
+      close();
+      cur = [{ n, label, selected: !!m[1] }];
+    } else if (cur.length && n === cur.length + 1) {
+      cur.push({ n, label, selected: !!m[1] });
+    } else {
+      close();
+    }
+  }
+  close();
+  return best;
+}

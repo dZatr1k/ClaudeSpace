@@ -10,15 +10,12 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import androidx.core.app.NotificationManagerCompat
+import android.provider.Settings
 import com.getcapacitor.JSObject
-import com.getcapacitor.PermissionState
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
-import com.getcapacitor.annotation.Permission
-import com.getcapacitor.annotation.PermissionCallback
 import io.github.claudespace.core.PhoneEvents
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -38,10 +35,7 @@ import kotlinx.serialization.json.jsonObject
  * The bridge of src/shared/mobile.ts (the web part's nativeBridge.ts) in front of CoreService. Arguments, results and
  * events cross as JSON text. Everything that reaches the WebView is posted on the main thread, in order.
  */
-@CapacitorPlugin(
-    name = "ClaudeSpace",
-    permissions = [Permission(strings = [Manifest.permission.POST_NOTIFICATIONS], alias = "notifications")],
-)
+@CapacitorPlugin(name = "ClaudeSpace")
 class BridgePlugin : Plugin() {
     private val main = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -57,8 +51,8 @@ class BridgePlugin : Plugin() {
             val s = (binder as CoreService.LocalBinder).service
             s.ui = events
             s.appVisible = true
-            s.applyBackground()
             bound = s
+            s.applyBackground()
             service.complete(s)
         }
 
@@ -123,6 +117,23 @@ class BridgePlugin : Plugin() {
         when (channel) {
             "launch.openExternal" -> openExternal(call, args)
             "notify.permission" -> permission(call, args)
+            "notify.openSettings" -> {
+                activity.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                resolve(call, JsonNull)
+            }
+            "ui.theme" -> {
+                val o = args.jsonObject
+                val dark = (o["dark"] as? JsonPrimitive)?.contentOrNull != "false"
+                val bg = (o["background"] as? JsonPrimitive)?.contentOrNull ?: ""
+                main.post {
+                    (activity as? MainActivity)?.applyTheme(dark, bg)
+                    call.resolve(JSObject().put("json", "null"))
+                }
+            }
             else -> scope.launch {
                 try {
                     resolve(call, service.await().core.invoke(channel, args))
@@ -140,22 +151,38 @@ class BridgePlugin : Plugin() {
         resolve(call, JsonNull)
     }
 
-    private fun permissionState(): String = when {
-        Build.VERSION.SDK_INT < 33 ->
-            if (NotificationManagerCompat.from(context).areNotificationsEnabled()) "granted" else "denied"
-        else -> when (getPermissionState("notifications")) {
-            PermissionState.GRANTED -> "granted"
-            PermissionState.DENIED -> "denied"
-            else -> "prompt"
-        }
+    private val prefs by lazy { context.getSharedPreferences("bridge", Context.MODE_PRIVATE) }
+
+    /** granted; prompt: Android can still show its dialog; denied: only the system settings can change it */
+    private fun permissionState(): String {
+        val a = activity as? MainActivity ?: return "denied"
+        if (a.notificationsAllowed()) return "granted"
+        if (Build.VERSION.SDK_INT < 33) return "denied" // notifications switched off for the app in the settings
+        val asked = prefs.getBoolean("askedNotifications", false)
+        return if (!asked || a.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) "prompt"
+        else "denied"
+    }
+
+    private fun note(line: String) {
+        bound?.core?.note("[app] $line")
     }
 
     private fun permission(call: PluginCall, args: JsonElement) {
         val request = (args.jsonObject["request"] as? JsonPrimitive)?.contentOrNull == "true"
-        if (request && permissionState() == "prompt") requestPermissionForAlias("notifications", call, "onPermission")
-        else resolve(call, JsonPrimitive(permissionState()))
+        main.post {
+            val state = permissionState()
+            val a = activity as? MainActivity
+            if (!request || state != "prompt" || a == null) {
+                note("notifications: $state")
+                return@post call.resolve(JSObject().put("json", JsonPrimitive(state).toString()))
+            }
+            note("notifications: asking Android")
+            prefs.edit().putBoolean("askedNotifications", true).apply()
+            a.askNotifications { granted ->
+                val now = permissionState()
+                note("notifications: answer granted=$granted, now $now")
+                call.resolve(JSObject().put("json", JsonPrimitive(now).toString()))
+            }
+        }
     }
-
-    @PermissionCallback
-    private fun onPermission(call: PluginCall) = resolve(call, JsonPrimitive(permissionState()))
 }

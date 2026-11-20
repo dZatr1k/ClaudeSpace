@@ -131,7 +131,7 @@ function registerClaude(session: string, status: string, chatId = '11111111-1111
   );
 }
 
-test('phone: setup, host key, lists, a chat with the key row and the Claude strip, settings', async () => {
+test('phone: setup, host key, lists, a chat with answers, keys, history and commands, settings', async () => {
   const { ctx, page, errors } = await phone('dark');
 
   // first run: no host yet -> setup with the phone key
@@ -205,18 +205,37 @@ test('phone: setup, host key, lists, a chat with the key row and the Claude stri
       .some((v) => /^CLAUDESPACE_APP=[0-9a-f]{16}$/.test(v)),
   ).toBe(true);
 
-  // Claude waits for an answer: the strip says so, the answer digits appear above the keys
+  // Claude waits for an answer: the header says so, «Прервать» is there
   registerClaude(session, 'waiting');
-  const strip = page.getByTestId('claude-strip');
-  await expect(strip).toContainText('ждёт ответа', { timeout: 10_000 });
-  await expect(page.getByRole('group', { name: 'Ответ на запрос Claude' })).toBeVisible();
+  const status = page.getByTestId('chat-status');
+  const header = page.locator('header');
+  await expect(status).toContainText('ждёт ответа', { timeout: 10_000 });
+  await expect(header.getByRole('button', { name: 'Прервать' })).toBeVisible();
+  // a menu on screen (the fake Claude's terminal echoes what tmux types into it) becomes answer buttons, as many as
+  // there are options, with their wording
+  const answers = page.getByRole('group', { name: 'Ответ на запрос Claude' });
+  await expect(answers).toHaveCount(0);
+  const menu = [
+    'Do you want to proceed?',
+    '❯ 1. Yes',
+    "  2. Yes, and don't ask again",
+    '  3. No, and tell Claude (esc)',
+  ];
+  for (const line of menu) tmux('send-keys', '-t', `=${session}:`, '-l', line + '\n');
+  await expect(answers.getByRole('button')).toHaveCount(3, { timeout: 5000 });
+  await expect(answers.getByRole('button').nth(1)).toHaveText("2Yes, and don't ask again");
+  for (const line of ['  4. Maybe', '  5. Later']) tmux('send-keys', '-t', `=${session}:`, '-l', line + '\n');
+  await expect(answers.getByRole('button')).toHaveCount(5, { timeout: 5000 });
+  await shot(page, 'm04-chat');
+  await answers.getByRole('button').nth(1).click();
+  const rows = term.locator('.xterm-rows');
+  await expect(rows).toContainText('5. Later2', { timeout: 5000 });
   // the input field: the text goes to the terminal whole, then Enter
   await page.getByTestId('composer').fill('проверка с телефона');
   await page.getByRole('button', { name: 'Отправить' }).click();
   await expect(term.locator('.xterm-rows')).toContainText('проверка с телефона', { timeout: 5000 });
   await expect(page.getByTestId('composer')).toHaveValue('');
   await noOverflow(page);
-  await shot(page, 'm04-chat');
 
   // a file from the phone: uploaded to the VM cache, its path lands in the input field
   const pc = mkdtempSync(join(tmpdir(), 'cs-phone-'));
@@ -231,40 +250,60 @@ test('phone: setup, host key, lists, a chat with the key row and the Claude stri
   rmSync(pc, { recursive: true, force: true });
   await page.getByTestId('composer').fill('');
 
-  // the key row: arrows and Esc as a keyboard sends them (the fake Claude's terminal echoes them as ^[[A), the answer
-  // digit without Enter, «Прервать» through the agent
-  const rows = term.locator('.xterm-rows');
+  // the history: a wheel (a swipe on the phone) scrolls tmux's copy-mode, «Вниз» comes back; typing comes back too
+  const inMode = () => tmux('display-message', '-p', '-t', `=${session}:`, '#{pane_in_mode}').trim();
+  await term.hover();
+  await page.mouse.wheel(0, -300);
+  await expect(page.getByRole('button', { name: 'Вниз' })).toBeVisible({ timeout: 5000 });
+  expect(inMode()).toBe('1');
+  await page.getByRole('button', { name: 'Вниз' }).click();
+  await expect(page.getByRole('button', { name: 'Вниз' })).toHaveCount(0);
+  await expect.poll(inMode).toBe('0');
+  await page.mouse.wheel(0, -300);
+  await expect.poll(inMode).toBe('1');
+
+  // «⋯»: the key row is off by default; on, it sends what a keyboard would (the echo shows ^[[A); input first leaves
+  // the history
+  const sheet = page.getByRole('dialog', { name: 'Команды' });
+  await expect(page.getByRole('group', { name: 'Клавиши терминала' })).toHaveCount(0);
+  await header.getByRole('button', { name: 'Команды' }).click();
+  await sheet.getByRole('switch', { name: /Клавиши терминала/ }).click();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Стрелка вверх' }).click();
   await expect(rows).toContainText('^[[A', { timeout: 5000 });
-  await page.getByRole('button', { name: 'Ответ 2' }).click();
-  await expect(rows).toContainText('^[[A2', { timeout: 5000 });
-  await strip.getByRole('button', { name: 'Прервать' }).click();
-  await expect(rows).toContainText('^[[A2^[', { timeout: 5000 });
+  await expect.poll(inMode).toBe('0');
+  await header.getByRole('button', { name: 'Прервать' }).click();
+  await expect(rows).toContainText('^[[A^[', { timeout: 5000 });
   for (const k of ['Esc', 'Tab', 'Shift+Tab', 'Стрелка влево', 'Стрелка вниз', 'Стрелка вправо', 'Enter'])
     await page.getByRole('button', { name: k, exact: true }).click();
-  // direct typing: the field gives way, the keyboard types into the terminal
-  await page.getByRole('button', { name: 'Набор прямо в терминал' }).click();
+  // direct typing (also in «⋯»): the field gives way, the keyboard types into the terminal
+  await header.getByRole('button', { name: 'Команды' }).click();
+  await sheet.getByRole('switch', { name: /Набор прямо в терминал/ }).click();
   await expect(page.getByTestId('composer')).toHaveCount(0);
   await page.keyboard.type('xyz');
   await expect(rows).toContainText('xyz', { timeout: 5000 });
-  await page.getByRole('button', { name: 'Набор прямо в терминал' }).click();
+  await page.getByRole('button', { name: 'Выключить' }).click();
   await expect(page.getByTestId('composer')).toBeVisible();
 
   // commands: busy Claude -> disabled with the reason; idle -> /compact typed into its pane
-  await strip.getByRole('button', { name: 'Команды' }).click();
-  const sheet = page.getByRole('dialog', { name: 'Команды' });
+  await header.getByRole('button', { name: 'Команды' }).click();
   await expect(sheet.getByRole('button', { name: /Сжать контекст/ })).toBeDisabled();
   await page.keyboard.press('Escape');
   registerClaude(session, 'idle');
-  await expect(strip).toContainText('простаивает', { timeout: 10_000 });
-  await strip.getByRole('button', { name: 'Команды' }).click();
+  await expect(status).toContainText('простаивает', { timeout: 10_000 });
+  await expect(header.getByRole('button', { name: 'Прервать' })).toHaveCount(0);
+  await header.getByRole('button', { name: 'Команды' }).click();
   await shot(page, 'm05-commands');
   await sheet.getByRole('button', { name: /Сжать контекст/ }).click();
   await expect(term.locator('.xterm-rows')).toContainText('/compact', { timeout: 5000 });
-  await strip.getByRole('button', { name: 'Команды' }).click();
-  await sheet.getByRole('button', { name: 'Opus /model opus', exact: true }).click();
+  await header.getByRole('button', { name: 'Команды' }).click();
+  await sheet.getByRole('button', { name: /^Модель/ }).click();
+  await page
+    .getByRole('dialog', { name: 'Модель' })
+    .getByRole('button', { name: 'Opus /model opus', exact: true })
+    .click();
   await expect(rows).toContainText('/model opus', { timeout: 5000 });
-  await strip.getByRole('button', { name: 'Команды' }).click();
+  await header.getByRole('button', { name: 'Команды' }).click();
   await sheet.getByRole('button', { name: /Очистить/ }).click();
   await expect(page.getByRole('alertdialog')).toContainText('Начать разговор заново?');
   await page.getByRole('alertdialog').getByRole('button', { name: 'Очистить' }).click();
@@ -332,6 +371,12 @@ test('phone: setup, host key, lists, a chat with the key row and the Claude stri
   await expect(bg).toHaveAttribute('aria-checked', 'true');
   await bg.scrollIntoViewIfNeeded();
   await shot(page, 'm10-settings-background');
+  // «Журнал подключения»: the core's log, to read and copy when something does not work
+  await page.getByRole('button', { name: /Журнал подключения/ }).click();
+  await expect(page.getByTestId('journal')).toContainText('[conn] online');
+  await page.getByRole('button', { name: 'Копировать журнал' }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('[conn] online');
+  await page.getByRole('button', { name: 'К списку' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark'); // the context asks for dark
   await page.getByRole('radio', { name: 'Светлая' }).click();
   await page.getByRole('button', { name: 'Шрифт меньше' }).click();
@@ -353,7 +398,11 @@ test('phone: setup, host key, lists, a chat with the key row and the Claude stri
   await page.setViewportSize({ width: 412, height: 892 });
 
   // Ctrl+B d typed straight into the terminal detaches tmux; «Подключить снова» attaches again
-  await page.getByRole('button', { name: 'Набор прямо в терминал' }).click();
+  await page.locator('header').getByRole('button', { name: 'Команды' }).click();
+  await page
+    .getByRole('dialog', { name: 'Команды' })
+    .getByRole('switch', { name: /Набор прямо в терминал/ })
+    .click();
   await page.keyboard.press('Control+b');
   await page.keyboard.press('d');
   await expect(page.getByTestId('term-overlay')).toContainText('Терминал отключён от сессии', {
@@ -361,7 +410,7 @@ test('phone: setup, host key, lists, a chat with the key row and the Claude stri
   });
   await page.getByRole('button', { name: 'Подключить снова' }).click();
   await expect(page.getByTestId('term-overlay')).toHaveCount(0, { timeout: 10_000 });
-  await page.getByRole('button', { name: 'Набор прямо в терминал' }).click();
+  await page.getByRole('button', { name: 'Выключить' }).click();
 
   // Ctrl from the key row + c in the field = Ctrl+C: the fake Claude exits, the session ends
   await page.getByRole('button', { name: 'Ctrl' }).click();

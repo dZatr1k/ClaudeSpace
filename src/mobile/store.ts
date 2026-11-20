@@ -4,7 +4,10 @@ import { create } from 'zustand';
 import type { MobileSettings, PhoneKey } from '@shared/mobile';
 
 export type Screen =
-  { kind: 'home' } | { kind: 'chat'; session: string; chatId: string | null } | { kind: 'settings' };
+  | { kind: 'home' }
+  | { kind: 'chat'; session: string; chatId: string | null }
+  | { kind: 'settings' }
+  | { kind: 'log' };
 
 export type Tone = 'info' | 'error' | 'success';
 

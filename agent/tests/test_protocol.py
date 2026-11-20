@@ -161,6 +161,22 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(r['error']['data']['session'], name)
         self.assertEqual(self.ag.call('archive_chat', {'chatId': fx.ID_CUSTOM})['error']['code'], 'chat_open')
         self.ok('focus_window', {'session': name, 'window': d.get('window') or '0'})
+        # the phone's swipe: history in copy-mode, back at the bottom it leaves copy-mode by itself; cancel at once
+        mode = lambda: fx.tmux('display-message', '-p', '-t', f'={name}:', '#{pane_in_mode}').stdout.strip()
+        self.assertEqual(self.ok('pane_scroll', {'session': name, 'action': 'down'}), {'inMode': False})
+        self.assertEqual(mode(), '0')
+        for _ in range(30):     # some history to scroll through
+            fx.tmux('send-keys', '-t', f'={name}:', '-l', 'x' * 10 + '\n')
+        self.assertTrue(self.ok('pane_scroll', {'session': name, 'action': 'up', 'lines': 5})['inMode'])
+        self.assertEqual(mode(), '1')
+        self.assertFalse(self.ok('pane_scroll', {'session': name, 'action': 'down', 'lines': 500})['inMode'])
+        self.ok('pane_scroll', {'session': name, 'action': 'up', 'lines': 3})
+        self.assertFalse(self.ok('pane_scroll', {'session': name, 'action': 'cancel'})['inMode'])
+        self.assertEqual(mode(), '0')
+        for bad in ({'session': name, 'action': 'left'}, {'session': name, 'action': 'up', 'lines': '5'},
+                    {'session': 'x y', 'action': 'up'}):
+            self.assertEqual(self.ag.call('pane_scroll', bad)['error']['code'], 'bad_request', bad)
+        self.assertEqual(self.ag.call('pane_scroll', {'session': 'nope', 'action': 'up'})['error']['code'], 'not_found')
         # rename + kill
         self.assertEqual(self.ok('rename_session', {'session': 'Alpha-2', 'name': 'my game!'})['session'], 'my_game_')
         self.assertEqual(self.ag.call('rename_session', {'session': 'my_game_', 'name': name})['error']['code'],

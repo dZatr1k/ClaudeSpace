@@ -1,7 +1,9 @@
 // The terminal of the open chat: one xterm attached to a tmux session over the bridge. Same channel rules as the
 // desktop controller (renderer/components/Terminal/controller.ts): acks for flow control, input only while the
 // channel is live, reattach after a reconnect. Phone specifics: the soft keyboard opens only in direct typing mode,
-// text from the input field goes in as a bracketed paste, the tmux status line is cut off to save rows.
+// text from the input field goes in as a bracketed paste, the tmux status line is cut off to save rows, a swipe
+// scrolls tmux's history (copy-mode through the agent: the phone's terminal shows tmux's screen and keeps none), and a
+// menu Claude Code shows on screen becomes answer buttons.
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
@@ -11,8 +13,8 @@ import { useConn } from '../renderer/stores/conn';
 import { useData } from '../renderer/stores/data';
 import { terminalFontFamily, terminalTheme } from '../renderer/theme/terminalThemes';
 import { agent, invoke, on } from './bridge';
-import { ctrlChar, keySeq, pasteSeq } from './keys';
-import type { KeyId } from './keys';
+import { ctrlChar, keySeq, menuOptions, pasteSeq } from './keys';
+import type { KeyId, MenuOption } from './keys';
 import { m } from './strings';
 import { useApp } from './store';
 
@@ -25,7 +27,23 @@ interface TermStore {
   ctrl: boolean;
   /** the soft keyboard types into the terminal itself instead of the input field */
   direct: boolean;
+  /** the key row is shown (a per-phone choice, remembered) */
+  keys: boolean;
+  /** the menu Claude Code shows now (permission prompt, question); [] when none */
+  menu: MenuOption[];
+  /** the history is scrolled up (tmux copy-mode): input brings it back to the bottom first */
+  scrolled: boolean;
   set(p: Partial<TermStore>): void;
+}
+
+const KEYS_PREF = 'cs.keyRow';
+
+function savedKeys(): boolean {
+  try {
+    return localStorage.getItem(KEYS_PREF) === '1';
+  } catch {
+    return false;
+  }
 }
 
 export const useTerm = create<TermStore>((set) => ({
@@ -33,8 +51,20 @@ export const useTerm = create<TermStore>((set) => ({
   error: null,
   ctrl: false,
   direct: false,
+  keys: savedKeys(),
+  menu: [],
+  scrolled: false,
   set: (p) => set(p),
 }));
+
+export function setKeys(keys: boolean): void {
+  useTerm.getState().set({ keys });
+  try {
+    localStorage.setItem(KEYS_PREF, keys ? '1' : '0');
+  } catch {
+    /* private storage off: the choice lasts until the app closes */
+  }
+}
 
 interface Current {
   tabId: string;
@@ -45,6 +75,10 @@ interface Current {
   ackBytes: number;
   ackTimer: number | null;
   opening: boolean;
+  /** scroll lines waiting to be sent (+: older), and the request in flight */
+  scrollPending: number;
+  scrolling: boolean;
+  menuTimer: number | null;
   dispose: (() => void)[];
 }
 
@@ -73,9 +107,122 @@ export async function loadTermFont(): Promise<void> {
 
 const setState = (state: TermState, error: string | null = null) => useTerm.getState().set({ state, error });
 
+/** input keeps its order across the async step of leaving the scrolled history */
+let queue: Promise<void> = Promise.resolve();
+
 function write(data: string): void {
   if (!cur || useTerm.getState().state !== 'live') return;
-  void invoke('term.write', { tabId: cur.tabId, data });
+  const c = cur;
+  queue = queue.then(async () => {
+    if (useTerm.getState().scrolled) await toBottom();
+    if (cur === c) await invoke('term.write', { tabId: c.tabId, data });
+  });
+}
+
+/** leave the history: tmux copy-mode ends, the screen is live again */
+export async function toBottom(): Promise<void> {
+  const c = cur;
+  if (!c) return;
+  c.scrollPending = 0;
+  useTerm.getState().set({ scrolled: false });
+  await agent('pane_scroll', { session: c.session, action: 'cancel' }).catch(() => undefined);
+}
+
+/** lines > 0: older (the finger moves down), < 0: newer. Requests are merged while one is in flight. */
+export function scrollBy(lines: number): void {
+  const c = cur;
+  if (!c || !lines || useTerm.getState().state !== 'live') return;
+  c.scrollPending += lines;
+  if (c.scrolling) return;
+  const flush = async () => {
+    while (c.scrollPending && cur === c) {
+      const n = c.scrollPending;
+      c.scrollPending = 0;
+      if (n < 0 && !useTerm.getState().scrolled) continue; // already at the bottom
+      try {
+        const r = await agent('pane_scroll', {
+          session: c.session,
+          action: n > 0 ? 'up' : 'down',
+          lines: Math.min(500, Math.abs(n)),
+        });
+        useTerm.getState().set({ scrolled: r.inMode });
+      } catch {
+        break;
+      }
+    }
+    c.scrolling = false;
+  };
+  c.scrolling = true;
+  void flush();
+}
+
+/** the menu on screen, read from the visible rows after output settles */
+function readMenu(c: Current): void {
+  if (c.menuTimer) window.clearTimeout(c.menuTimer);
+  c.menuTimer = window.setTimeout(() => {
+    c.menuTimer = null;
+    const buf = c.term.buffer.active;
+    const lines: string[] = [];
+    for (let y = buf.viewportY; y < buf.viewportY + c.term.rows; y++)
+      lines.push(buf.getLine(y)?.translateToString(true) ?? '');
+    const menu = menuOptions(lines);
+    const prev = useTerm.getState().menu;
+    if (JSON.stringify(menu) !== JSON.stringify(prev)) useTerm.getState().set({ menu });
+  }, 120);
+}
+
+/** A swipe on the terminal scrolls the history instead of reaching xterm, which would turn it into arrow keys (in
+ * tmux's alternate screen) and walk Claude Code's prompt history. A tap without movement still focuses it. */
+function wireGestures(c: Current): () => void {
+  let lastY: number | null = null;
+  let acc = 0;
+  let moved = false;
+  const cellH = () =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((c.term as any)._core?._renderService?.dimensions?.css?.cell?.height as number | undefined) || 16;
+  const start = (e: TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    lastY = e.touches[0]!.clientY;
+    acc = 0;
+    moved = false;
+    e.stopPropagation();
+  };
+  const move = (e: TouchEvent) => {
+    if (lastY === null || e.touches.length !== 1) return;
+    const y = e.touches[0]!.clientY;
+    acc += y - lastY;
+    lastY = y;
+    if (Math.abs(acc) > 6) moved = true;
+    const lines = Math.trunc(acc / cellH());
+    if (lines) {
+      acc -= lines * cellH();
+      scrollBy(lines);
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const end = (e: TouchEvent) => {
+    if (lastY === null) return;
+    lastY = null;
+    if (moved) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+  const opts = { capture: true, passive: false } as const;
+  c.host.addEventListener('touchstart', start, opts);
+  c.host.addEventListener('touchmove', move, opts);
+  c.host.addEventListener('touchend', end, opts);
+  // a mouse wheel (the browser dev mode, a mouse on the phone): the same history
+  c.term.attachCustomWheelEventHandler((e) => {
+    if (e.deltaY) scrollBy(e.deltaY < 0 ? 3 : -3);
+    return false;
+  });
+  return () => {
+    c.host.removeEventListener('touchstart', start, opts);
+    c.host.removeEventListener('touchmove', move, opts);
+    c.host.removeEventListener('touchend', end, opts);
+  };
 }
 
 /** keys typed into the terminal (direct mode) or sent by the key row; Ctrl from the key row applies once */
@@ -254,10 +401,13 @@ export function mountTerminal(host: HTMLElement, session: string): () => void {
     ackBytes: 0,
     ackTimer: null,
     opening: false,
+    scrollPending: 0,
+    scrolling: false,
+    menuTimer: null,
     dispose: [],
   };
   cur = c;
-  useTerm.getState().set({ state: 'connecting', error: null, ctrl: false });
+  useTerm.getState().set({ state: 'connecting', error: null, ctrl: false, menu: [], scrolled: false });
   term.open(host);
   setDirect(useTerm.getState().direct);
   term.onData((d) => input(d));
@@ -269,7 +419,10 @@ export function mountTerminal(host: HTMLElement, session: string): () => void {
     on('term.data', ({ tabId, data }) => {
       if (tabId !== c.tabId) return;
       const n = data.byteLength;
-      term.write(data, () => ack(n));
+      term.write(data, () => {
+        ack(n);
+        readMenu(c);
+      });
     }),
     on('term.exit', ({ tabId }) => {
       if (tabId === c.tabId && cur === c) void onExit();
@@ -281,7 +434,7 @@ export function mountTerminal(host: HTMLElement, session: string): () => void {
     timer = window.setTimeout(fit, 80);
   });
   ro.observe(host);
-  c.dispose.push(() => ro.disconnect());
+  c.dispose.push(() => ro.disconnect(), wireGestures(c));
   // offline -> overlay; back online and the first session list arrived -> attach again
   c.dispose.push(
     useConn.subscribe((s, p) => {
@@ -308,6 +461,10 @@ export function mountTerminal(host: HTMLElement, session: string): () => void {
     window.clearTimeout(timer);
     for (const d of c.dispose) d();
     if (c.ackTimer) window.clearTimeout(c.ackTimer);
+    if (c.menuTimer) window.clearTimeout(c.menuTimer);
+    // leaving the chat with the history scrolled: the PC's view of the pane must not stay in copy-mode
+    if (useTerm.getState().scrolled)
+      void agent('pane_scroll', { session: c.session, action: 'cancel' }).catch(() => undefined);
     void invoke('term.close', { tabId: c.tabId });
     term.dispose();
     if (cur === c) cur = null;

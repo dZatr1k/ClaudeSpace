@@ -5,6 +5,7 @@ import { hasBridge } from './bridge';
 import { Chat } from './screens/Chat';
 import { ConnScreen, NoBridge } from './screens/Connect';
 import { Home } from './screens/Home';
+import { Log } from './screens/Log';
 import { Settings } from './screens/Settings';
 import { useApp } from './store';
 import { ConfirmDialog, Toasts } from './ui';
@@ -20,6 +21,7 @@ export function App() {
 
   let body;
   if (screen.kind === 'settings') body = <Settings />;
+  else if (screen.kind === 'log') body = <Log />;
   else if (conn.kind === 'needs-user' || (!everOnline && conn.kind !== 'online'))
     body = <ConnScreen state={conn} />;
   else if (screen.kind === 'chat')

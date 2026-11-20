@@ -66,6 +66,8 @@ export class DevCore {
   private readonly ownUd: boolean;
   private settings: MobileSettings;
   private simulated: ConnState | null = null;
+  /** recent log lines for the page's «Журнал» */
+  private readonly journal: string[] = [];
   /** the latest list events, replayed to a page that opens on a running core (events.replay) */
   private readonly latest = new Map<string, unknown>();
   private readonly owners = new Map<string, WebSocketClient>();
@@ -98,7 +100,12 @@ export class DevCore {
       ptyHelper,
       appKnownHosts: join(this.ud, 'known_hosts'),
       localFactory: () => new LocalTransport(ptyHelper, '/bin/bash', this.home),
-      log: (...a) => opts.log?.(a.map(String).join(' ')),
+      log: (...a) => {
+        const line = a.map(String).join(' ');
+        this.journal.push(`${new Date().toTimeString().slice(0, 8)} ${line}`);
+        if (this.journal.length > 400) this.journal.shift();
+        opts.log?.(line);
+      },
     });
     this.conn.on('state', () => this.pushState());
     this.conn.on('agent-event', (event: string, data: unknown) => {
@@ -261,6 +268,11 @@ export class DevCore {
           : [];
       case 'notify.permission':
         return 'granted';
+      case 'notify.openSettings':
+      case 'ui.theme':
+        return undefined;
+      case 'log.get':
+        return [...this.journal];
       case 'term.open': {
         const p = termOpenSchema.safeParse(a);
         if (!p.success) return { ok: false, error: 'неверные параметры терминала' };

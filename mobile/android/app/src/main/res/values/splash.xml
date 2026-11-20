@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- bg-base of the light theme (src/renderer/theme/tokens.css) -->
-    <color name="splash_background">#FBFAF8</color>
+    <!-- bg-base of the dark theme (src/renderer/theme/tokens.css): the app is dark by default, so are the start screen
+         and the window behind the page; with the light theme the bridge repaints the window (BridgePlugin, ui.theme) -->
+    <color name="splash_background">#121110</color>
 </resources>

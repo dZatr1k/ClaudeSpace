@@ -81,6 +81,27 @@ def send_keys(pane, *keys, literal=False):
     run(['send-keys', '-t', pane] + (['-l'] if literal else []) + list(keys), check=True)
 
 
+def scroll(name, action, lines=1):
+    """Scroll the history of a session's current pane in tmux copy-mode (the phone's swipe: its terminal has no history
+    of its own, tmux keeps it). up enters copy-mode with -e, so scrolling back to the bottom leaves it by itself; cancel
+    leaves it at once. Returns True while the pane is still in copy-mode."""
+    target = f'={name}:'
+
+    def in_mode():
+        return run(['display-message', '-p', '-t', target, '#{pane_in_mode}']).strip() == '1'
+
+    if action == 'up':
+        if not in_mode():
+            run(['copy-mode', '-e', '-t', target], check=True)
+        run(['send-keys', '-t', target, '-X', '-N', str(lines), 'scroll-up'], check=True)
+    elif in_mode():
+        if action == 'down':
+            run(['send-keys', '-t', target, '-X', '-N', str(lines), 'scroll-down'], check=True)
+        else:
+            run(['send-keys', '-t', target, '-X', 'cancel'], check=True)
+    return in_mode()
+
+
 def status_layout():
     """-> {lines, top}: how many rows the tmux status line takes and where (global options; default 1, bottom)."""
     st = run(['show-options', '-gv', 'status']).strip()

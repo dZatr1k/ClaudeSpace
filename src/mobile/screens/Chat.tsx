@@ -1,9 +1,19 @@
-// A chat: the terminal of its tmux session full screen, then the Claude strip, the key row and the input field at the
-// bottom, so the keyboard pushes them up together. Text is typed in the field and goes to Claude Code whole: typing
-// straight into the terminal breaks on Android keyboards (autocorrect, composition), so that is a switch.
-import { ChevronLeft, Ellipsis, Keyboard, Paperclip, SendHorizontal, Square } from 'lucide-react';
+// A chat: the header carries the chat's title and Claude's status, «Прервать» while Claude works and «⋯» for the rest;
+// the terminal fills the screen; the input field sits at the bottom, so the keyboard pushes it up. A menu Claude Code
+// shows (a permission prompt, a question) becomes answer buttons above the field. The key row and direct typing are
+// switches in «⋯»: text goes to Claude Code whole from the field, typing straight into the terminal breaks on Android
+// keyboards (autocorrect, composition). A swipe on the terminal scrolls the history.
+import {
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  Ellipsis,
+  Paperclip,
+  SendHorizontal,
+  Square,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { CLAUDE_MODELS } from '@shared/protocol';
 import type { ClaudeProc, Session } from '@shared/model';
 import { StatusIcon } from '../../renderer/components/ui/StatusIcon';
@@ -23,6 +33,8 @@ import {
   pressKey,
   sendText,
   setDirect,
+  setKeys,
+  toBottom,
   typePath,
   typeRaw,
   useTerm,
@@ -42,7 +54,7 @@ async function send(params: Parameters<typeof agent<'claude_send'>>[1]): Promise
   }
 }
 
-function TermOverlay({ session }: { session: string }) {
+function TermOverlay() {
   const state = useTerm((s) => s.state);
   const error = useTerm((s) => s.error);
   if (state === 'live') return null;
@@ -69,130 +81,88 @@ function TermOverlay({ session }: { session: string }) {
         </Button>
       )}
       {state === 'ended' && <Button onClick={back}>{m.chat.back}</Button>}
-      <span className="sr-only">{session}</span>
     </div>
   );
 }
 
-function ClaudeStrip({ c }: { c: ClaudeProc }) {
-  const now = useNow(15_000);
+/** back to the live screen after scrolling the history */
+function ToBottom() {
+  const scrolled = useTerm((s) => s.scrolled);
+  if (!scrolled) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => void toBottom()}
+      className="anim-rise absolute bottom-3 right-3 flex min-h-11 items-center gap-2 rounded-[10px] border border-line-strong bg-elevated px-4 text-[14px] shadow-pop active:bg-selected"
+    >
+      <ArrowDown size={16} aria-hidden /> {m.chat.toBottom}
+    </button>
+  );
+}
+
+/** The menu on screen as buttons with its own wording; a digit picks the option in Claude Code, without Enter. */
+function Answers() {
+  const menu = useTerm((s) => s.menu);
+  const live = useTerm((s) => s.state === 'live');
+  if (!live || !menu.length) return null;
   return (
     <div
-      className="flex min-h-13 shrink-0 items-center gap-1 border-t border-line bg-surface py-1 pl-4 pr-1"
-      role="toolbar"
-      aria-label={t.claudeBar.label}
-      data-testid="claude-strip"
+      role="group"
+      aria-label={m.chat.answers}
+      className="max-h-[40dvh] shrink-0 overflow-y-auto border-t border-line bg-surface py-1"
+      data-testid="answers"
     >
-      <StatusIcon status={claudeUi(c.status)} size={16} unknown={isUnknownStatus(c.status)} />
-      <span className="tnum min-w-0 flex-1 truncate pl-1 text-[14px] text-muted" aria-live="polite">
-        {statusLine(c.status, c.statusAt, now)}
-      </span>
-      {canInterrupt(c) && (
-        <Button
-          className="min-h-11 px-3"
-          onClick={() => void send({ chatId: c.chatId, action: 'interrupt' })}
+      {menu.map((o) => (
+        <button
+          key={o.n}
+          type="button"
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={() => typeRaw(String(o.n))}
+          className="flex min-h-11 w-full items-center gap-3 px-4 py-1.5 text-left active:bg-selected"
         >
-          <Square size={14} aria-hidden /> {t.claudeBar.interrupt}
-        </Button>
-      )}
-      <IconButton label={m.chat.commands} onClick={() => useApp.getState().set({ sheet: 'commands' })}>
-        <Ellipsis size={22} strokeWidth={1.75} aria-hidden />
-      </IconButton>
+          <span
+            className={`tnum flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] border text-[14px] font-medium ${
+              o.selected ? 'border-st-waiting text-st-waiting' : 'border-line-strong text-muted'
+            }`}
+            aria-hidden
+          >
+            {o.n}
+          </span>
+          <span
+            className={`min-w-0 flex-1 text-[15px] leading-snug ${o.selected ? 'text-fg' : 'text-muted'}`}
+          >
+            {o.label}
+          </span>
+        </button>
+      ))}
     </div>
   );
 }
 
-function CommandsSheet({ c }: { c: ClaudeProc | null }) {
-  const close = () => useApp.getState().set({ sheet: null });
-  const idle = canCommand(c);
-  const hint = idle ? undefined : t.claudeBar.busy;
-  return (
-    <Sheet title={m.chat.commands} onClose={close}>
-      {!idle && <p className="px-4 pb-2 text-[14px] text-muted">{hint}</p>}
-      <SheetItem
-        disabled={!idle || !c}
-        hint="/compact"
-        onClick={() => {
-          close();
-          if (c) void send({ chatId: c.chatId, action: 'compact' });
-        }}
-      >
-        {t.claudeBar.compact}
-      </SheetItem>
-      <SheetItem
-        disabled={!idle || !c}
-        hint="/clear"
-        onClick={() => {
-          close();
-          if (!c) return;
-          useApp.getState().set({
-            dialog: {
-              title: t.claudeBar.clearTitle,
-              body: t.claudeBar.clearBody,
-              confirm: t.claudeBar.clear,
-              onConfirm: () => void send({ chatId: c.chatId, action: 'clear' }),
-            },
-          });
-        }}
-      >
-        {t.claudeBar.clear}
-      </SheetItem>
-      <div className="px-4 pb-1 pt-3 text-[13px] font-semibold text-muted">{t.claudeBar.model}</div>
-      {CLAUDE_MODELS.map((model) => (
-        <SheetItem
-          key={model}
-          disabled={!idle || !c}
-          hint={`/model ${model}`}
-          onClick={() => {
-            close();
-            if (c) void send({ chatId: c.chatId, action: 'model', model });
-          }}
-        >
-          {t.claudeBar.models[model] ?? model}
-        </SheetItem>
-      ))}
-    </Sheet>
-  );
-}
-
-function KeyRow({ waiting }: { waiting: boolean }) {
+function KeyRow() {
   const ctrl = useTerm((s) => s.ctrl);
   const key =
     'flex h-11 min-w-0 flex-1 items-center justify-center rounded-[6px] text-[14px] active:bg-selected';
   return (
-    <div className="shrink-0 border-t border-line bg-surface px-1 py-1">
-      {waiting && (
-        <div className="mb-1 flex gap-1" role="group" aria-label={m.chat.answers}>
-          {['1', '2', '3'].map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-label={m.chat.answer(Number(n))}
-              className={`${key} tnum border border-st-waiting font-medium text-st-waiting`}
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={() => typeRaw(n)}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="flex gap-0.5" role="group" aria-label={m.chat.keys}>
-        {KEY_ROW.map((k) => (
-          <button
-            key={k.id}
-            type="button"
-            aria-label={k.name}
-            aria-pressed={k.id === 'ctrl' ? ctrl : undefined}
-            title={k.id === 'ctrl' && ctrl ? m.chat.ctrlArmed : k.name}
-            className={`${key} ${k.id === 'ctrl' && ctrl ? 'bg-accent-soft font-semibold text-accent-text' : 'text-fg'}`}
-            onPointerDown={(e) => e.preventDefault()}
-            onClick={() => pressKey(k.id)}
-          >
-            {k.label}
-          </button>
-        ))}
-      </div>
+    <div
+      className="flex shrink-0 gap-0.5 border-t border-line bg-surface px-1 py-1"
+      role="group"
+      aria-label={m.chat.keys}
+    >
+      {KEY_ROW.map((k) => (
+        <button
+          key={k.id}
+          type="button"
+          aria-label={k.name}
+          aria-pressed={k.id === 'ctrl' ? ctrl : undefined}
+          title={k.id === 'ctrl' && ctrl ? m.chat.ctrlArmed : k.name}
+          className={`${key} ${k.id === 'ctrl' && ctrl ? 'bg-accent-soft font-semibold text-accent-text' : 'text-fg'}`}
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={() => pressKey(k.id)}
+        >
+          {k.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -264,52 +234,194 @@ function Composer() {
       <IconButton label={m.chat.attach} disabled={!live} onClick={() => file.current?.click()}>
         <Paperclip size={20} strokeWidth={1.75} aria-hidden />
       </IconButton>
-      {!direct && (
-        // the label sits on the field's border: always visible (R-39), yet it costs no extra row
-        <div className="relative min-w-0 flex-1">
-          <label
-            htmlFor="composer"
-            className="pointer-events-none absolute -top-2 left-2 bg-surface px-1 text-[11px] leading-4 text-muted"
-          >
-            {m.chat.placeholder}
-          </label>
-          <textarea
-            id="composer"
-            ref={area}
-            rows={1}
-            value={text}
-            className="block min-h-11 w-full resize-none rounded-[6px] border border-control bg-base px-3 py-2.5 text-[16px] leading-[22px] text-fg outline-none focus:border-accent"
-            onKeyDown={onKey}
-            onChange={(e) => {
-              // Ctrl from the key row: the one letter just typed goes to the terminal with Ctrl instead. Read from the
-              // change, not from key events: Android keyboards rarely send those while composing
-              const v = e.target.value;
-              if (useTerm.getState().ctrl && v.length === text.length + 1) {
-                const at = Math.max(0, (e.target.selectionStart ?? v.length) - 1);
-                const typed = v[at] as string;
-                if (v.slice(0, at) + v.slice(at + 1) === text && ctrlFromField(typed)) return;
-              }
-              setText(v);
-            }}
-            data-testid="composer"
-          />
+      {direct ? (
+        <div className="flex min-h-11 flex-1 items-center gap-2 pl-1">
+          <span className="min-w-0 flex-1 text-[14px] text-muted">{m.chat.directOn}</span>
+          <Button kind="quiet" className="min-h-11 px-3" onClick={() => setDirect(false)}>
+            {m.chat.directOff}
+          </Button>
         </div>
-      )}
-      {direct && <span className="min-h-11 flex-1 px-2 py-3 text-[14px] text-muted">{m.chat.direct}</span>}
-      <IconButton label={m.chat.direct} aria-pressed={direct} onClick={() => setDirect(!direct)}>
-        <Keyboard size={20} strokeWidth={1.75} aria-hidden />
-      </IconButton>
-      {!direct && (
-        <IconButton
-          label={m.chat.send}
-          disabled={!live || !text.trim()}
-          className="bg-accent text-accent-fg disabled:bg-transparent disabled:text-faint"
-          onClick={submit}
-        >
-          <SendHorizontal size={20} strokeWidth={1.75} aria-hidden />
-        </IconButton>
+      ) : (
+        <>
+          {/* the label sits on the field's border: always visible (R-39), yet it costs no extra row */}
+          <div className="relative min-w-0 flex-1">
+            <label
+              htmlFor="composer"
+              className="pointer-events-none absolute -top-2 left-2 bg-surface px-1 text-[11px] leading-4 text-muted"
+            >
+              {m.chat.placeholder}
+            </label>
+            <textarea
+              id="composer"
+              ref={area}
+              rows={1}
+              value={text}
+              className="block min-h-11 w-full resize-none rounded-[6px] border border-control bg-base px-3 py-2.5 text-[16px] leading-[22px] text-fg outline-none focus:border-accent"
+              onKeyDown={onKey}
+              onChange={(e) => {
+                // Ctrl from the key row: the one letter just typed goes to the terminal with Ctrl instead. Read from
+                // the change, not from key events: Android keyboards rarely send those while composing
+                const v = e.target.value;
+                if (useTerm.getState().ctrl && v.length === text.length + 1) {
+                  const at = Math.max(0, (e.target.selectionStart ?? v.length) - 1);
+                  const typed = v[at] as string;
+                  if (v.slice(0, at) + v.slice(at + 1) === text && ctrlFromField(typed)) return;
+                }
+                setText(v);
+              }}
+              data-testid="composer"
+            />
+          </div>
+          <IconButton
+            label={m.chat.send}
+            disabled={!live || !text.trim()}
+            className="bg-accent text-accent-fg disabled:bg-transparent disabled:text-faint"
+            onClick={submit}
+          >
+            <SendHorizontal size={20} strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </>
       )}
     </div>
+  );
+}
+
+function SwitchItem({
+  on,
+  onClick,
+  children,
+  hint,
+}: {
+  on: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  hint?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onClick}
+      className="flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left active:bg-selected"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px]">{children}</span>
+        {hint && <span className="block text-[13px] text-muted">{hint}</span>}
+      </span>
+      <span
+        aria-hidden
+        className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors duration-100 ${on ? 'border-accent bg-accent' : 'border-control bg-base'}`}
+      >
+        <span
+          className={`absolute top-[3px] h-5 w-5 rounded-full transition-[left] duration-100 ${on ? 'left-[24px] bg-accent-fg' : 'left-[3px] bg-muted'}`}
+        />
+      </span>
+    </button>
+  );
+}
+
+/** «⋯»: the terminal switches, then Claude's commands (only while it is idle: Enter at a permission prompt would
+ * approve it). The models open as their own list, so the sheet stays short. */
+function ChatSheet({ c }: { c: ClaudeProc | null }) {
+  const close = () => useApp.getState().set({ sheet: null });
+  const keys = useTerm((s) => s.keys);
+  const direct = useTerm((s) => s.direct);
+  const [models, setModels] = useState(false);
+  const idle = canCommand(c);
+  if (models && c)
+    return (
+      <Sheet title={t.claudeBar.model} onClose={close}>
+        <SheetItem onClick={() => setModels(false)}>
+          <span className="flex items-center gap-2 text-muted">
+            <ChevronLeft size={18} aria-hidden /> {m.chat.commands}
+          </span>
+        </SheetItem>
+        {CLAUDE_MODELS.map((model) => (
+          <SheetItem
+            key={model}
+            disabled={!idle}
+            hint={`/model ${model}`}
+            onClick={() => {
+              close();
+              void send({ chatId: c.chatId, action: 'model', model });
+            }}
+          >
+            {t.claudeBar.models[model] ?? model}
+          </SheetItem>
+        ))}
+      </Sheet>
+    );
+  return (
+    <Sheet title={m.chat.commands} onClose={close}>
+      <SwitchItem on={keys} onClick={() => setKeys(!keys)} hint={m.chat.keysHint}>
+        {m.chat.keys}
+      </SwitchItem>
+      <SwitchItem
+        on={direct}
+        onClick={() => {
+          close();
+          setDirect(!direct);
+        }}
+        hint={m.chat.directHint}
+      >
+        {m.chat.direct}
+      </SwitchItem>
+      {c && (
+        <>
+          <div className="px-4 pb-1 pt-3 text-[13px] font-semibold text-muted">Claude</div>
+          {!idle && <p className="px-4 pb-2 text-[14px] text-muted">{t.claudeBar.busy}</p>}
+          <SheetItem
+            disabled={!idle}
+            hint="/compact"
+            onClick={() => {
+              close();
+              void send({ chatId: c.chatId, action: 'compact' });
+            }}
+          >
+            {t.claudeBar.compact}
+          </SheetItem>
+          <SheetItem
+            disabled={!idle}
+            hint="/clear"
+            onClick={() => {
+              close();
+              useApp.getState().set({
+                dialog: {
+                  title: t.claudeBar.clearTitle,
+                  body: t.claudeBar.clearBody,
+                  confirm: t.claudeBar.clear,
+                  onConfirm: () => void send({ chatId: c.chatId, action: 'clear' }),
+                },
+              });
+            }}
+          >
+            {t.claudeBar.clear}
+          </SheetItem>
+          <SheetItem disabled={!idle} hint="/model" onClick={() => setModels(true)}>
+            <span className="flex items-center justify-between gap-2">
+              {t.claudeBar.model}
+              <ChevronRight size={18} className="text-faint" aria-hidden />
+            </span>
+          </SheetItem>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+function Status({ c, session }: { c: ClaudeProc | null; session: string }) {
+  const now = useNow(15_000);
+  if (!c) return <p className="mono truncate text-muted">{session}</p>;
+  return (
+    <p
+      className="flex items-center gap-1.5 text-[13px] text-muted"
+      aria-live="polite"
+      data-testid="chat-status"
+    >
+      <StatusIcon status={claudeUi(c.status)} size={13} unknown={isUnknownStatus(c.status)} />
+      <span className="tnum truncate">{statusLine(c.status, c.statusAt, now)}</span>
+    </p>
   );
 }
 
@@ -318,10 +430,12 @@ export function Chat({ session, chatId }: { session: string; chatId: string | nu
   const sessions = useData((d) => d.sessions);
   const chats = useData((d) => d.chats);
   const sheet = useApp((s) => s.sheet);
+  const keys = useTerm((x) => x.keys);
+  const direct = useTerm((x) => x.direct);
+  const live = useTerm((x) => x.state === 'live');
   const s: Session | undefined = sessions.find((x) => x.name === session);
   const c = s ? primaryClaude(s) : null;
   const title = s ? sessionTitle(s) : (chatId && chats[chatId]?.title) || session;
-  const live = useTerm((x) => x.state === 'live');
 
   useEffect(() => {
     if (!host.current) return;
@@ -330,23 +444,35 @@ export function Chat({ session, chatId }: { session: string; chatId: string | nu
 
   return (
     <div className="safe flex h-full flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-1 border-b border-line bg-surface pr-3">
+      <header className="flex h-14 shrink-0 items-center gap-1 border-b border-line bg-surface pr-1">
         <IconButton label={m.chat.back} onClick={back}>
           <ChevronLeft size={24} strokeWidth={1.75} aria-hidden />
         </IconButton>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-[16px] font-semibold">{title}</h1>
-          <p className="mono truncate text-muted">{session}</p>
+          <Status c={live ? c : null} session={session} />
         </div>
+        {live && canInterrupt(c) && c && (
+          <Button
+            className="min-h-11 px-3 text-[14px]"
+            onClick={() => void send({ chatId: c.chatId, action: 'interrupt' })}
+          >
+            <Square size={14} aria-hidden /> {t.claudeBar.interrupt}
+          </Button>
+        )}
+        <IconButton label={m.chat.commands} onClick={() => useApp.getState().set({ sheet: 'commands' })}>
+          <Ellipsis size={22} strokeWidth={1.75} aria-hidden />
+        </IconButton>
       </header>
       <div className="relative min-h-0 flex-1 overflow-hidden bg-base">
         <div ref={host} className="absolute inset-0" data-testid="terminal" />
-        <TermOverlay session={session} />
+        <TermOverlay />
+        <ToBottom />
       </div>
-      {live && c && <ClaudeStrip c={c} />}
-      <KeyRow waiting={live && c?.status === 'waiting'} />
+      <Answers />
+      {(keys || direct) && <KeyRow />}
       <Composer />
-      {sheet === 'commands' && <CommandsSheet c={c} />}
+      {sheet === 'commands' && <ChatSheet c={live ? c : null} />}
     </div>
   );
 }

@@ -105,6 +105,10 @@ class PhoneCoreTest {
             call("events.replay").jsonArray.takeIf { r -> r.any { it.jsonObject["event"]!!.jsonPrimitive.content == "projects_changed" } }
         }
         assertEquals("hello", replay.first().jsonObject["event"]!!.jsonPrimitive.content)
+        // the journal has the connection steps
+        val journal = call("log.get").jsonArray.map { it.jsonPrimitive.content }
+        assertTrue(journal.any { it.contains("[conn] online") }, journal.takeLast(5).toString())
+        assertTrue(journal.none { it.contains("PRIVATE KEY") })
         val chats = replay.first { it.jsonObject["event"]!!.jsonPrimitive.content == "chats_changed" }
             .jsonObject["data"]!!.jsonObject["full"]!!.jsonArray
         assertTrue(chats.size > 3)

@@ -13,11 +13,19 @@ import { go, useApp, wireHistory } from './store';
 
 const media = window.matchMedia('(prefers-color-scheme: dark)');
 
+let barsFor: boolean | null = null;
+
 function applyTheme() {
-  const pref = useApp.getState().settings?.appearance.theme ?? 'system';
+  const pref = useApp.getState().settings?.appearance.theme ?? 'dark';
   const dark = pref === 'system' ? media.matches : pref === 'dark';
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   if (useApp.getState().dark !== dark) useApp.getState().set({ dark });
+  // Android's status and navigation bars and the window behind the page take the page's colours
+  if (hasBridge() && barsFor !== dark) {
+    barsFor = dark;
+    const background = getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim();
+    void invoke('ui.theme', { dark, background }).catch(() => undefined);
+  }
 }
 
 /**

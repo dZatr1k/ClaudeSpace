@@ -18,7 +18,8 @@ data class PhoneSettings(
     val host: String = "",
     val port: Int = 22,
     val user: String = "",
-    val theme: String = "system",
+    /** dark by default: the terminal is dark, a light page around it looked out of place on the phone */
+    val theme: String = "dark",
     val fontSize: Int = 12,
     /** keep the connection in a foreground service: notifications also while the app is closed */
     val background: Boolean = true,
@@ -59,7 +60,7 @@ data class PhoneSettings(
     fun save(file: File) {
         file.parentFile?.mkdirs()
         val tmp = File(file.path + ".tmp")
-        tmp.writeText(toJson().toString())
+        tmp.writeText(JsonObject(toJson() + ("v" to JsonPrimitive(VERSION))).toString())
         if (!tmp.renameTo(file)) {
             file.writeText(tmp.readText())
             tmp.delete()
@@ -67,8 +68,13 @@ data class PhoneSettings(
     }
 
     companion object {
+        /** 2: the default theme became dark; a file without "v" was saved when «system» was the default */
+        private const val VERSION = 2
+
         fun load(file: File): PhoneSettings = try {
-            PhoneSettings().merge(Json.parseToJsonElement(file.readText()).jsonObject)
+            val o = Json.parseToJsonElement(file.readText()).jsonObject
+            val s = PhoneSettings().merge(o)
+            if (o["v"] == null && s.theme == "system") s.copy(theme = "dark") else s
         } catch (_: Exception) {
             PhoneSettings()
         }

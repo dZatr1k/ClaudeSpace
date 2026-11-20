@@ -134,6 +134,14 @@ export const methodSchemas = {
   claude_doc_write: z
     .object({ path, text: z.string().max(512 * 1024), mtime: z.number().int().min(0).nullable() })
     .strict(),
+  /** the phone scrolls a session's history in tmux copy-mode (its terminal keeps none) */
+  pane_scroll: z
+    .object({
+      session,
+      action: z.enum(['up', 'down', 'cancel']),
+      lines: z.number().int().min(1).max(500).optional(),
+    })
+    .strict(),
   claude_send: z.discriminatedUnion('action', [
     z.object({ chatId, action: z.enum(['interrupt', 'compact', 'clear']) }).strict(),
     z.object({ chatId, action: z.literal('model'), model: z.enum(CLAUDE_MODELS) }).strict(),
@@ -200,6 +208,7 @@ export interface MethodResults {
   git_log: { root: string | null; commits: GitCommit[] };
   git_show: { root: string; hash: string; diff: string; truncated: boolean };
   claude_send: { pane: string; status: string; stashed?: boolean };
+  pane_scroll: { inMode: boolean };
   claude_config: ClaudeConfig;
   git_worktrees: { main: string; current: string | null; worktrees: GitWorktree[] };
   worktree_create: { path: string; branch: string; base: string | null; created: boolean };
