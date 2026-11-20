@@ -66,6 +66,13 @@ describe('mobile settings', () => {
     expect(mergeMobileSettings(n, { appearance: { theme: 'neon' as never } }).appearance.theme).toBe(
       'system',
     );
+    expect(n.notifications.background).toBe(true);
+    expect(mergeMobileSettings(n, { notifications: { background: false } }).notifications.background).toBe(
+      false,
+    );
+    expect(
+      mergeMobileSettings(n, { notifications: { background: 'no' as never } }).notifications.background,
+    ).toBe(true);
     expect(mergeMobileSettings(n, { appearance: { theme: 'light', fontSize: 14 } }).appearance).toEqual({
       theme: 'light',
       fontSize: 14,

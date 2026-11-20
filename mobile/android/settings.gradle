@@ -1,4 +1,6 @@
 include ':app'
+// the phone core (SSH, agent, terminals; mobile/core), built and tested on the JVM, used here as a library
+includeBuild('../core')
 include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
 

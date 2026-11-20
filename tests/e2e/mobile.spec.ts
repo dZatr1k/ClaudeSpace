@@ -6,7 +6,7 @@ import { chromium, expect, test } from '@playwright/test';
 import type { Browser, BrowserContext, Page } from '@playwright/test';
 import { execFileSync, spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -278,6 +278,28 @@ test('phone: setup, host key, lists, a chat with the key row and the Claude stri
   await noOverflow(page);
   await shot(page, 'm03-home');
 
+  // a turn ends while the list is open (the hook line the agent tails): a toast that opens that chat
+  appendFileSync(
+    join(fh.home, '.cache', 'claudespace', 'events.jsonl'),
+    JSON.stringify({
+      ts: Date.now(),
+      kind: 'input',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      cwd: fh.alpha,
+      project: 'Alpha',
+      body: 'Разрешить npm test?',
+    }) + '\n',
+  );
+  const turn = page.getByRole('button', { name: 'Alpha: Claude ждёт ввода' });
+  await expect(turn).toBeVisible({ timeout: 10_000 });
+  await turn.click();
+  await expect(page.getByTestId('terminal')).toBeVisible();
+  await page.getByRole('button', { name: 'К списку' }).click();
+  // a page that opens on a running core (the app reopened while the service kept the link) gets the lists replayed
+  await page.reload();
+  await expect(page.getByTestId(`session-${session}`)).toContainText('ждёт ответа', { timeout: 10_000 });
+  await expect(page.getByTestId('chat-11111111-1111-4111-8111-111111111111')).toBeVisible();
+
   // offline after being online: a banner over the lists, not a full screen
   await simulate(page, {
     kind: 'offline',
@@ -298,6 +320,18 @@ test('phone: setup, host key, lists, a chat with the key row and the Claude stri
   await page.getByRole('radio', { name: 'Тёмная' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.getByRole('radio', { name: 'Как в системе' }).click();
+  // background connection: on by default, the switch turns it off and back on
+  const bg = page.getByRole('switch', { name: 'Держать связь в фоне' });
+  await expect(bg).toHaveAttribute('aria-checked', 'true');
+  await bg.click();
+  await expect(bg).toHaveAttribute('aria-checked', 'false');
+  await expect(
+    page.getByText('Без фона уведомления приходят, только пока приложение открыто.'),
+  ).toBeVisible();
+  await bg.click();
+  await expect(bg).toHaveAttribute('aria-checked', 'true');
+  await bg.scrollIntoViewIfNeeded();
+  await shot(page, 'm10-settings-background');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark'); // the context asks for dark
   await page.getByRole('radio', { name: 'Светлая' }).click();
   await page.getByRole('button', { name: 'Шрифт меньше' }).click();

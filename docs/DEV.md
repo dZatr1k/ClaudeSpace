@@ -34,7 +34,7 @@ npm run dev:vm              # на этой VM (Electron с --no-sandbox, см. 
 | `npm run test:agent` | агент: unittest (stdlib), фейковый HOME, реальный tmux на отдельном сокете `claudespace-test-py-*` | 90 |
 | `npm run test:unit` | vitest: unit (hostkey, rpc, keymap, format, stores, terminals, settings, ports, askpass, search, tray…) + integration | 110 |
 | `npm test` | оба набора | 200 |
-| `npm run mobile:core` | ядро приложения для телефона на Kotlin (`mobile/core`) на JVM: юнит-тесты и настоящий агент за встроенным SSH-сервером MINA SSHD; нужен JDK 21 | 37 |
+| `npm run mobile:core` | ядро приложения для телефона на Kotlin (`mobile/core`) на JVM: юнит-тесты и настоящий агент за встроенным SSH-сервером MINA SSHD; нужен JDK 21 | 51 |
 | `npm run test:e2e` | Playwright `_electron`: окно, сайдбар, терминал, палитра, оверлеи, пароль sudo, поиск по чатам, закрытие в трей, обрыв, перезапуск; скриншоты в `docs/screenshots/`, включая узкое окно 960×600 и светлую тему (собирает `out/`: сначала `npm run build`). Плюс интерфейс телефона в Chromium без окна (`mobile.spec.ts`, снимки `m*.png`) | 3 сценария |
 | `npm run lint`, `npm run typecheck` | ESLint + Prettier, `tsc` strict для main/preload/shared и renderer | |
 
@@ -353,9 +353,9 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
 ## Приложение для Android (этап 8)
 
 План и решения: [MOBILE.md](MOBILE.md). Сделан этап 1 (2026-11-19): каркас, который собирается в APK и пока только
-показывает свою версию. Этап 3 (2026-11-20): ядро на Kotlin в `mobile/core`, в APK оно пока не входит (раздел
-«Ядро на Kotlin» ниже). Этап 4 (2026-11-20): интерфейс телефона, пока работает только в браузере (раздел
-«Интерфейс телефона»).
+показывает свою версию. Этап 3 (2026-11-20): ядро на Kotlin в `mobile/core` (раздел «Ядро на Kotlin» ниже). Этап 4
+(2026-11-20): интерфейс телефона (раздел «Интерфейс телефона»). Этап 5 (2026-11-20): служба и мост, APK подключается
+к VM сам (раздел «Служба Android»); на телефоне это ещё не проверялось.
 
 - **Инструменты.** JDK 21 и Android SDK (платформа 36, build-tools 35 и 36). На этой VM они стоят в
   `~/.local/opt/jdk-21` и `~/.local/opt/android-sdk`, без sudo. `scripts/mobile.mjs` берёт их из `JAVA_HOME` и
@@ -394,8 +394,10 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
 `lib/format.ts`, `components/ui/StatusIcon.tsx`, `i18n/ru.ts`). Как выглядит и почему так: `docs/DESIGN.md` §5.10.
 
 - **Мост** (`src/shared/mobile.ts`): каналы, которые интерфейс просит у ядра, и события от него. В основном это каналы
-  IPC с ПК с теми же типами. На Android мост даст служба (этап 5). В браузере его заменяет `src/mobile/devBridge.ts`.
-  Без моста (нынешний APK) интерфейс честно пишет, что эта сборка к VM не подключается.
+  IPC с ПК с теми же типами. На Android это `src/mobile/nativeBridge.ts` перед службой (раздел «Служба Android»), в
+  браузере `src/mobile/devBridge.ts`. Без моста (бандл открыт не в приложении и не под Vite) интерфейс пишет, что
+  эта сборка к VM не подключается. Интерфейс, открытый на уже работающем ядре, берёт списки из `events.replay`; тап
+  по уведомлению приходит событием `notify.click` и открывает чат.
 - **Dev-ядро** (`src/main/mobileDev.ts`): плагин Vite из `vite.mobile.config.ts`, только для `vite serve`. Он запускает
   в процессе dev-сервера ядро main (`Connection` с `LocalTransport`, `TerminalManager`, `uploadAttachment`) и
   отвечает странице через websocket Vite (`src/shared/mobileWire.ts`, байты в base64). Фейковый HOME создаётся из
@@ -444,6 +446,11 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
 | `Installer.kt` | `probe`, `installPlan`, загрузка по SFTP, проверка sha256 на VM, замена папки. Бандл агента задаёт `AgentBundle`: в тестах это папка, в APK будут assets | `agent/installer.ts` |
 | `AgentRpc.kt` | JSON Lines: запросы по id с таймаутом, события. Методов агента ядро не разбирает, параметры и результаты проходят как JSON | `agent/rpc.ts` |
 | `Terminals.kt` | команды терминалов с `CLAUDESPACE_APP`, пачки по 8 мс, пауза после 1 МБ без подтверждений | `terminals.ts` |
+| `PhoneCore.kt` | каналы моста (`src/shared/mobile.ts`): настройки, ключ, связь, вызовы агента (кроме методов только для main ПК), терминалы, файлы, снимок списков для `events.replay` | `mobileDev.ts` |
+| `PhoneSettings.kt` | настройки телефона в форме `MobileSettings`, проверка присланных значений | `shared/mobile.ts` |
+| `Attach.kt` | файл с телефона в `~/.cache/claudespace` на VM, имя и тип как на ПК | `attach.ts` |
+| `Notices.kt` | `turn_done` агента в уведомление: только пока приложение скрыто, каждый ход один раз | `notifier.ts` |
+| `KeyVault.kt` | где лежит ключ телефона; на JVM файл, на Android Keystore (`KeystoreVault.kt` в приложении) | |
 
 - **Тесты** в `mobile/core/src/test/`. Юнит-тесты повторяют случаи `hostkey`, `installer`, `terminals` и `rpc` с ПК,
   ключ проверяется настоящим `ssh-keygen` в обе стороны. Интеграционные (`SshIntegrationTest`, `SshFailuresTest`)
@@ -456,8 +463,48 @@ Markdown с таблицами GFM и шапкой YAML (0.7.6, `components/ui/M
   `resources/agent`: иначе тесты ядра и vitest переписывали бы одну папку одновременно. tmux работает на сокете
   `claudespace-test-kt-<pid>`, `~/.ssh` и установленный агент тесты не трогают.
 - Для тестов нужны JDK 21, python3, tmux, `ssh-keygen` и git. В CI они идут в задаче `android` перед сборкой APK.
+- Тестовый SFTP-сервер разрешает пути, как sshd на VM: относительные от HOME, абсолютные как есть
+  (`SftpFileSystemAccessor` в `TestSupport.kt`).
 - Не проверено: ядро внутри приложения на Android (замена провайдера BouncyCastle, sshj в процессе приложения) и
-  подключение к настоящему OpenSSH: тесты подключаются к MINA SSHD. Это проверится на телефоне на этапе 5.
+  подключение к настоящему OpenSSH: тесты подключаются к MINA SSHD. Это проверится на телефоне.
+
+### Служба Android (этап 8, шаг 5, 2026-11-20)
+
+Android-часть тонкая: всё, что можно проверить на JVM, лежит в `PhoneCore` (`mobile/core`). Код в
+`mobile/android/app/src/main/java/io/github/claudespace/`, на Kotlin.
+
+- **Сборка.** `mobile/android` подключает ядро как included build (`includeBuild('../core')` в `settings.gradle`,
+  зависимость `io.github.claudespace:core`). Задача `agentAssets` в `app/build.gradle` собирает бандл агента
+  (`build_manifest.py --out`) в `build/generated/agent-assets/agent`, он попадает в APK как `assets/agent`. Для сборки
+  APK теперь нужен python3. APK вырос с 4 до 9 МБ: sshj, BouncyCastle, Kotlin.
+- **`CoreService`** держит `PhoneCore`. Пока приложение открыто, его привязывает плагин. С «Держать связь в фоне»
+  (`notifications.background`, по умолчанию включено) служба ещё и запущена в переднем плане с тихим уведомлением
+  «На связи: user@host» (канал «Связь с VM», важность минимальная, значок ◆ `ic_stat_diamond`), поэтому связь и
+  уведомления остаются, когда приложение закрыто. Выключатель снимает службу с переднего плана, и она живёт, пока
+  открыто приложение. Тип `specialUse` с пояснением в манифесте, `START_STICKY`.
+- **`BridgePlugin`** (Capacitor, имя `ClaudeSpace`) пересылает `invoke` службе. Аргументы, результаты и события идут
+  JSON-текстом, ответы и события отправляются в WebView из главного потока по порядку. Сам плагин обрабатывает
+  `launch.openExternal` (только http и https) и `notify.permission` (разрешение `POST_NOTIFICATIONS` на Android 13+).
+  Видимость приложения он передаёт службе (`handleOnResume` и `handleOnPause`).
+- **Уведомления о ходах Claude** (канал «Claude», высокая важность) появляются только при скрытом приложении:
+  открытое показывает тост само. Источник тот же, что на ПК: `turn_done` от агента, то есть хук пользователя
+  `notify.sh`. Название берётся по проекту чата. Новое уведомление того же чата заменяет старое. Тап открывает
+  приложение на этом чате (`notify.click` с `retainUntilConsumed`: на холодном старте событие ждёт слушателя).
+  Разрешение на уведомления интерфейс спрашивает один раз при первом подключении. В Настройках виден его статус и
+  есть кнопка «Разрешить уведомления».
+- **Ключ телефона** (`KeystoreVault`): ed25519 в формате OpenSSH, зашифрованный AES-GCM ключом из Android Keystore,
+  в `files/phone_key.enc`. Комментарий ключа «ClaudeSpace <модель телефона>». Если расшифровать не получается (данные
+  перенесены на другой телефон), старый файл откладывается, создаётся новый ключ, и экран подключения покажет его.
+- **Безопасность:** `SshTransport.installSecurity()` заменяет урезанный провайдер «BC» Android полным BouncyCastle
+  до первого вызова sshj. `loggingBehavior: none` в `capacitor.config.json`: иначе Capacitor писал бы в лог вызовы
+  плагина, а в них текст, набранный в терминале, включая пароль sudo. Строки ядра идут в logcat только в отладочной
+  сборке.
+- **Кнопка «Назад»** (`MainActivity`): сначала история WebView (чат, настройки), потом обычное поведение Android.
+- **Проверено:** ядро и все каналы (`PhoneCoreTest` на JVM), сборка APK, Android Lint без замечаний к нашему коду,
+  мост на стороне веб-части (`tests/unit/mobileNative.web.test.ts`).
+- **Не проверено на телефоне** (эмулятора на VM нет): служба, уведомления и тап по ним, разрешение, Keystore, замена
+  BouncyCastle и sshj внутри приложения, подключение к настоящему sshd, клавиатура Android поверх поля ввода
+  (`SystemBars` из Capacitor добавляет отступ на высоту клавиатуры), кнопка «Назад», выбор файла.
 
 ## Выпуск релиза
 

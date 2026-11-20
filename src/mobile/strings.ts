@@ -104,6 +104,10 @@ export const m = {
     noPorts: 'Это порт на VM. С телефона порты пока не открываются',
     model: (name: string) => `Модель: ${name}`,
   },
+  notify: {
+    input: (name: string) => `${name}: Claude ждёт ввода`,
+    done: (name: string) => `${name}: Claude ответил`,
+  },
   settings: {
     title: 'Настройки',
     connection: 'Подключение',
@@ -116,6 +120,15 @@ export const m = {
     smaller: 'Шрифт меньше',
     bigger: 'Шрифт больше',
     px: (n: number) => `${n} px`,
+    background: 'Фон и уведомления',
+    backgroundSwitch: 'Держать связь в фоне',
+    backgroundHint:
+      'Уведомления «Claude ждёт ввода» и «Claude ответил» приходят, даже когда приложение закрыто. Пока связь в фоне, в шторке виден значок ClaudeSpace.',
+    backgroundOff: 'Без фона уведомления приходят, только пока приложение открыто.',
+    permissionDenied:
+      'Android не разрешает приложению показывать уведомления. Включите их в настройках системы.',
+    permissionPrompt: 'Android ещё не спросил, можно ли показывать уведомления.',
+    permissionAsk: 'Разрешить уведомления',
     about: 'О приложении',
     version: (v: string) => `ClaudeSpace ${v}`,
     agent: (v: string) => `Агент на VM ${v}`,

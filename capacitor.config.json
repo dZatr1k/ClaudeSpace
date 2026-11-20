@@ -10,5 +10,6 @@
       "insetsHandling": "css",
       "initialViewportFitValueHint": "cover"
     }
-  }
+  },
+  "loggingBehavior": "none"
 }

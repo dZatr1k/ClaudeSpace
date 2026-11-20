@@ -1,12 +1,13 @@
 // Settings: the connection (saving reconnects), the phone key, the theme and the terminal font.
 import { ChevronLeft, Minus, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { MOBILE_FONT_MAX, MOBILE_FONT_MIN } from '@shared/mobile';
-import type { MobileSettings } from '@shared/mobile';
+import type { MobileSettings, NotifyPermission } from '@shared/mobile';
 import { useData } from '../../renderer/stores/data';
 import { invoke } from '../bridge';
 import { m } from '../strings';
 import { back, useApp } from '../store';
-import { IconButton, KeyBlock, SectionTitle } from '../ui';
+import { Button, IconButton, KeyBlock, SectionTitle } from '../ui';
 import { SetupForm } from './Connect';
 
 const THEMES: MobileSettings['appearance']['theme'][] = ['system', 'dark', 'light'];
@@ -14,6 +15,56 @@ const THEMES: MobileSettings['appearance']['theme'][] = ['system', 'dark', 'ligh
 async function setAppearance(p: Partial<MobileSettings['appearance']>) {
   const s = await invoke('settings.set', { appearance: p });
   useApp.getState().set({ settings: s });
+}
+
+/** Background connection and Android's notification permission (asked when the switch goes on). */
+function Background({ on }: { on: boolean }) {
+  const [perm, setPerm] = useState<NotifyPermission | null>(null);
+  useEffect(() => {
+    void invoke('notify.permission', { request: false }).then(setPerm, () => setPerm(null));
+  }, []);
+  const ask = () => void invoke('notify.permission', { request: true }).then(setPerm);
+  const toggle = async () => {
+    const s = await invoke('settings.set', { notifications: { background: !on } });
+    useApp.getState().set({ settings: s });
+    if (s.notifications.background && perm === 'prompt') ask();
+  };
+  return (
+    <div className="px-4">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        onClick={() => void toggle()}
+        className="flex min-h-12 w-full items-center gap-3 text-left"
+      >
+        <span className="flex-1 text-[15px]">{m.settings.backgroundSwitch}</span>
+        <span
+          aria-hidden
+          className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors duration-100 ${on ? 'border-accent bg-accent' : 'border-control bg-base'}`}
+        >
+          <span
+            className={`absolute top-[3px] h-5 w-5 rounded-full transition-[left] duration-100 ${on ? 'left-[24px] bg-accent-fg' : 'left-[3px] bg-muted'}`}
+          />
+        </span>
+      </button>
+      <p className="text-[14px] leading-snug text-muted">
+        {on ? m.settings.backgroundHint : m.settings.backgroundOff}
+      </p>
+      {perm && perm !== 'granted' && (
+        <div className="mt-3 rounded-[6px] border border-st-waiting p-3">
+          <p className="text-[14px] leading-snug">
+            {perm === 'denied' ? m.settings.permissionDenied : m.settings.permissionPrompt}
+          </p>
+          {perm === 'prompt' && (
+            <Button className="mt-2 w-full" onClick={ask}>
+              {m.settings.permissionAsk}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function Settings() {
@@ -89,6 +140,9 @@ export function Settings() {
               </IconButton>
             </div>
           </div>
+
+          <SectionTitle>{m.settings.background}</SectionTitle>
+          <Background on={settings.notifications.background} />
 
           <SectionTitle>{m.settings.about}</SectionTitle>
           <div className="px-4 text-[14px] text-muted">

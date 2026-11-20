@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlinx.serialization.json.JsonElement
 import org.apache.sshd.common.config.keys.PublicKeyEntry
-import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
+import org.apache.sshd.common.file.nativefs.NativeFileSystemFactory
 import org.apache.sshd.common.keyprovider.KeyPairProvider
 import org.apache.sshd.server.Environment
 import org.apache.sshd.server.ExitCallback
@@ -22,7 +22,9 @@ import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.channel.ChannelSession
 import org.apache.sshd.server.command.Command
 import org.apache.sshd.server.command.CommandFactory
+import org.apache.sshd.sftp.server.SftpFileSystemAccessor
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
+import org.apache.sshd.sftp.server.SftpSubsystemProxy
 
 // Test fixtures: the repo, the real agent bundle, a fake HOME built by the agent's Python fixture, a tmux server of
 // our own (never the user's), and an in-process SSH server (Apache MINA SSHD) that runs commands as the VM's sshd
@@ -118,8 +120,20 @@ class TestSshd(
         passwordAuthenticator = null
         keyboardInteractiveAuthenticator = null
         commandFactory = CommandFactory { _, cmd -> ProcessCommand(cmd) }
-        subsystemFactories = listOf(SftpSubsystemFactory())
-        fileSystemFactory = VirtualFileSystemFactory(home.toPath())
+        // SFTP paths as the VM's sshd treats them: relative ones from HOME, absolute ones as they are
+        subsystemFactories = listOf(
+            SftpSubsystemFactory().apply {
+                fileSystemAccessor = object : SftpFileSystemAccessor {
+                    override fun resolveLocalFilePath(
+                        subsystem: SftpSubsystemProxy,
+                        rootDir: java.nio.file.Path,
+                        remotePath: String,
+                    ): java.nio.file.Path =
+                        if (remotePath.startsWith("/")) java.nio.file.Paths.get(remotePath) else home.toPath().resolve(remotePath)
+                }
+            },
+        )
+        fileSystemFactory = NativeFileSystemFactory()
     }
 
     init {

@@ -12,6 +12,8 @@ export interface Toast {
   id: number;
   text: string;
   tone: Tone;
+  /** a tap on the toast does this (open the chat it is about) */
+  action?: () => void;
 }
 
 export interface ConfirmDialog {
@@ -33,7 +35,7 @@ interface AppStore {
   dialog: ConfirmDialog | null;
   sheet: Sheet;
   set(p: Partial<AppStore>): void;
-  toast(text: string, tone?: Tone, ms?: number): void;
+  toast(text: string, tone?: Tone, ms?: number, action?: () => void): void;
   dismiss(id: number): void;
 }
 
@@ -48,10 +50,12 @@ export const useApp = create<AppStore>((set, get) => ({
   dialog: null,
   sheet: null,
   set: (p) => set(p),
-  toast: (text, tone = 'info', ms = 4000) => {
+  toast: (text, tone = 'info', ms = 4000, action) => {
     const id = toastSeq++;
     // the same text twice in a row (a repeated tap) is one toast
-    set((s) => ({ toasts: [...s.toasts.filter((x) => x.text !== text), { id, text, tone }].slice(-3) }));
+    set((s) => ({
+      toasts: [...s.toasts.filter((x) => x.text !== text), { id, text, tone, action }].slice(-3),
+    }));
     window.setTimeout(() => get().dismiss(id), ms);
   },
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })),

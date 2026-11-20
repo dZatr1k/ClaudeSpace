@@ -250,7 +250,10 @@ export function Toasts() {
         <button
           key={x.id}
           type="button"
-          onClick={() => dismiss(x.id)}
+          onClick={() => {
+            dismiss(x.id);
+            x.action?.();
+          }}
           className={`anim-rise pointer-events-auto max-w-md rounded-[10px] bg-elevated px-4 py-3 text-left text-[14px] leading-snug shadow-pop ${
             x.tone === 'error' ? 'border border-st-error' : 'border border-line-strong'
           }`}

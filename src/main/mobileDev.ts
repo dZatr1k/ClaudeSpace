@@ -47,6 +47,9 @@ function makeHome(root: string): string {
   return home;
 }
 
+/** list events a page needs to fill its lists when it opens on a running core */
+const REPLAYED = ['hello', 'active_changed', 'projects_changed', 'system', 'doctor_warning', 'ports_changed'];
+
 /**
  * Vite re-evaluates this module when it reloads the config (a restart), so state that must outlive one config load
  * (the live cores, the signal handler, the socket counter) is kept on globalThis.
@@ -63,6 +66,8 @@ export class DevCore {
   private readonly ownUd: boolean;
   private settings: MobileSettings;
   private simulated: ConnState | null = null;
+  /** the latest list events, replayed to a page that opens on a running core (events.replay) */
+  private readonly latest = new Map<string, unknown>();
   private readonly owners = new Map<string, WebSocketClient>();
   private readonly seen = new WeakSet<WebSocketClient>();
   readonly conn: Connection;
@@ -96,9 +101,10 @@ export class DevCore {
       log: (...a) => opts.log?.(a.map(String).join(' ')),
     });
     this.conn.on('state', () => this.pushState());
-    this.conn.on('agent-event', (event: string, data: unknown) =>
-      this.broadcast({ event: 'agent.event', data: { event, data } }),
-    );
+    this.conn.on('agent-event', (event: string, data: unknown) => {
+      this.remember(event, data);
+      this.broadcast({ event: 'agent.event', data: { event, data } });
+    });
     this.conn.on('offline', () => this.terms.dropAll());
     this.terms = new TerminalManager(
       {
@@ -125,6 +131,17 @@ export class DevCore {
     } catch {
       return defaultMobileSettings();
     }
+  }
+
+  private remember(event: string, data: unknown) {
+    if (event === 'chats_changed') {
+      const d = data as { full?: { id: string }[]; upsert?: { id: string }[]; remove?: string[] };
+      const prev = (this.latest.get(event) as { full: { id: string }[] } | undefined)?.full ?? [];
+      const map = new Map((d.full ?? prev).map((c) => [c.id, c]));
+      for (const c of d.upsert ?? []) map.set(c.id, c);
+      for (const id of d.remove ?? []) map.delete(id);
+      this.latest.set(event, { full: [...map.values()] });
+    } else if (REPLAYED.includes(event)) this.latest.set(event, data);
   }
 
   private configured(): boolean {
@@ -236,6 +253,14 @@ export class DevCore {
       }
       case 'key.get':
         return this.key();
+      case 'events.replay':
+        return this.conn.state.kind === 'online'
+          ? [...this.latest]
+              .map(([event, data]) => ({ event, data }))
+              .sort((a, b) => Number(b.event === 'hello') - Number(a.event === 'hello'))
+          : [];
+      case 'notify.permission':
+        return 'granted';
       case 'term.open': {
         const p = termOpenSchema.safeParse(a);
         if (!p.success) return { ok: false, error: 'неверные параметры терминала' };
