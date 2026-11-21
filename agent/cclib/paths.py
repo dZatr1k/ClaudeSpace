@@ -141,6 +141,7 @@ def atomic_write_json(path, data):
     import json
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = f'{path}.{os.getpid()}.tmp'
+    text = json.dumps(data, ensure_ascii=False)   # one C-encoder pass; json.dump writes in small chunks
     with open(tmp, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False)
+        f.write(text)
     os.replace(tmp, path)

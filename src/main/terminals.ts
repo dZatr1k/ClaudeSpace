@@ -1,5 +1,6 @@
 // Terminal channels: exec with a PTY on the current transport. tmux tabs attach to a session; temporary tabs run
-// shell/lazygit/yazi/git clone directly. Output is batched (8 ms) and flow-controlled with renderer acks.
+// shell/lazygit/yazi/git clone directly. Output after a quiet spell goes out at once (a key's echo), a burst is
+// batched (8 ms); flow-controlled with renderer acks.
 import type { TermOpenArgs } from '../shared/ipc';
 import { SESSION_RE } from '../shared/protocol';
 import { APP_ID_RE } from './agent/installer';
@@ -56,6 +57,8 @@ interface Term {
   pending: Buffer[];
   pendingBytes: number;
   timer: NodeJS.Timeout | null;
+  /** when the last batch went to the renderer (ms) */
+  sentAt: number;
   unacked: number;
   paused: boolean;
 }
@@ -85,7 +88,15 @@ export class TerminalManager {
     this.close(a.tabId);
     const cmd = terminalCommand(a, this.tmuxSocket(), this.appId());
     const ch = await t.exec(cmd, { pty: { cols: a.cols, rows: a.rows, term: 'xterm-256color' } });
-    const term: Term = { ch, pending: [], pendingBytes: 0, timer: null, unacked: 0, paused: false };
+    const term: Term = {
+      ch,
+      pending: [],
+      pendingBytes: 0,
+      timer: null,
+      sentAt: 0,
+      unacked: 0,
+      paused: false,
+    };
     this.terms.set(a.tabId, term);
     ch.on('data', (b: Buffer) => this.onData(a.tabId, term, b));
     ch.on('stderr', (b: Buffer) => this.onData(a.tabId, term, b));
@@ -106,13 +117,17 @@ export class TerminalManager {
       term.paused = true;
       term.ch.pause();
     }
-    if (!term.timer) term.timer = setTimeout(() => this.flush(tabId, term), BATCH_MS);
+    if (term.timer) return;
+    const quiet = Date.now() - term.sentAt;
+    if (quiet >= BATCH_MS) this.flush(tabId, term);
+    else term.timer = setTimeout(() => this.flush(tabId, term), BATCH_MS - quiet);
   }
 
   private flush(tabId: string, term: Term) {
     if (term.timer) clearTimeout(term.timer);
     term.timer = null;
     if (!term.pendingBytes) return;
+    term.sentAt = Date.now();
     const data = Buffer.concat(term.pending, term.pendingBytes);
     term.pending = [];
     term.pendingBytes = 0;

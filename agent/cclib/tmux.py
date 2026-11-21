@@ -48,30 +48,46 @@ def run(args, timeout=5, check=False, base=None):
     return r.stdout
 
 
-def sessions():
-    fmt = '\t'.join(['#{session_name}', '#{session_attached}', '#{session_activity}', '#{session_windows}',
-                     '#{pane_current_path}', '#{pane_current_command}'])
-    res = []
-    for line in run(['list-sessions', '-F', fmt]).splitlines():
+SNAPSHOT_FMT = '\t'.join(['#{pane_id}', '#{session_name}', '#{window_index}', '#{window_active}', '#{pane_active}',
+                           '#{session_attached}', '#{session_activity}', '#{session_windows}',
+                           '#{pane_current_path}', '#{pane_current_command}'])
+
+
+def parse_snapshot(out):
+    """`list-panes -a -F SNAPSHOT_FMT` -> (sessions, panes). A session takes its path and command from the active pane
+    of its active window, as list-sessions shows them. sessions: [{name, attached, activity, windows, path, command}]
+    in tmux order; panes: pane id (%N) -> (session name, window index)."""
+    res, pmap, seen = [], {}, {}
+    for line in out.splitlines():
         f = line.split('\t')
-        if len(f) < 6:
+        if len(f) < 10:
             continue
+        pmap[f[0]] = (f[1], f[2])
         try:
-            res.append(dict(name=f[0], attached=int(f[1] or 0), activity=int(f[2] or 0) * 1000,
-                            windows=int(f[3] or 0), path=f[4], command=f[5]))
+            s = dict(name=f[1], attached=int(f[5] or 0), activity=int(f[6] or 0) * 1000, windows=int(f[7] or 0),
+                     path=f[8], command=f[9])
         except ValueError:
             continue
-    return res
+        if f[1] not in seen:
+            seen[f[1]] = len(res)
+            res.append(s)
+        elif f[3] == '1' and f[4] == '1':
+            res[seen[f[1]]] = s
+    return res, pmap
+
+
+def snapshot():
+    """(sessions, panes) from one tmux call; the agent polls this every few seconds."""
+    return parse_snapshot(run(['list-panes', '-a', '-F', SNAPSHOT_FMT]))
+
+
+def sessions():
+    return snapshot()[0]
 
 
 def panes():
     """pane id (%N) -> (session name, window index)."""
-    m = {}
-    for line in run(['list-panes', '-a', '-F', '#{pane_id}\t#{session_name}\t#{window_index}']).splitlines():
-        f = line.split('\t')
-        if len(f) == 3:
-            m[f[0]] = (f[1], f[2])
-    return m
+    return snapshot()[1]
 
 
 def send_keys(pane, *keys, literal=False):

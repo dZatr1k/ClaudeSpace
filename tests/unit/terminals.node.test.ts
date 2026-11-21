@@ -132,11 +132,14 @@ describe('TerminalManager', () => {
     expect(t.last?.opts?.pty).toEqual({ cols: 100, rows: 30, term: 'xterm-256color' });
     const ch = t.last!.ch;
     for (let i = 0; i < 10; i++) ch.emit('data', Buffer.alloc(1000));
+    expect(got).toEqual([1000]); // the first chunk after a quiet spell goes out at once (a key's echo)
     await new Promise((r) => setTimeout(r, 30));
-    expect(got).toEqual([10000]); // one batch
+    expect(got).toEqual([1000, 9000]); // the rest of the burst: one batch
+    ch.emit('data', Buffer.alloc(1));
+    expect(got).toEqual([1000, 9000, 1]); // quiet again: no wait
     ch.emit('data', Buffer.alloc(HIGH_WATER));
     expect(ch.paused).toBe(true);
-    tm.ack('a', HIGH_WATER + 10000 - LOW_WATER);
+    tm.ack('a', HIGH_WATER + 10001 - LOW_WATER);
     expect(ch.paused).toBe(true);
     tm.ack('a', 1);
     expect(ch.paused).toBe(false);

@@ -35,7 +35,8 @@ from cclib import (askpass, chats, claudecfg, claudeinput, doctor, files, gitvie
 AGENT_VERSION = '0.4.0'
 PROTOCOL = 1
 MAX_FRAME = 4 * 1024 * 1024
-POLL = {'sessions': 1.0, 'tmux': 2.0, 'chats': 3.0, 'projects': 30.0, 'system': 10.0, 'winfs': 5.0, 'ports': 3.0, 'askpass': 2.0}
+POLL = {'sessions': 1.0, 'tmux': 2.0, 'chats': 3.0, 'projects': 30.0, 'busy_git': 10.0, 'system': 10.0, 'winfs': 5.0,
+        'ports': 3.0, 'askpass': 2.0}
 WINDOW_RE = re.compile(r'^[0-9]{1,4}$')
 SEARCH_ID_RE = re.compile(r'^[A-Za-z0-9_-]{1,32}$')
 SLOW = {'usage', 'doctor', 'system', 'project_preview', 'session_preview', 'mosh_list', 'mosh_kill_stale',
@@ -88,6 +89,15 @@ def own_hash():
             return manifest_hash({rel: file_sha(os.path.join(HERE, rel)) for rel in agent_files()})
         except OSError:
             return None
+
+
+QUIET_CHAT_KEYS = ('sizeBytes', 'lastAt')
+
+
+def quiet_change(old, new):
+    """Only sizeBytes/lastAt changed: the chat is growing. Projects use lastAt only to sort, so the project list
+    waits for its own poll (POLL['projects']) instead of being rebuilt every few seconds."""
+    return old is not None and all(old.get(k) == v for k, v in new.items() if k not in QUIET_CHAT_KEYS)
 
 
 class AgentError(Exception):
@@ -228,8 +238,7 @@ class Agent:
         self.procs = sessions.live()
 
     def refresh_tmux(self):
-        self.tsess = tmux.sessions()
-        self.panes = tmux.panes()
+        self.tsess, self.panes = tmux.snapshot()
 
     def build_active(self):
         by_sess = {}
@@ -261,11 +270,12 @@ class Agent:
         aliases = chats.load_titles()
         return {c['sid']: chats.to_model(c, opened.get(c['sid']), aliases) for c in raw}
 
-    def live_by_project(self):
+    def live_by_project(self, every):
+        """every: non-archived raw chats"""
         res = {}
         for s in self.tsess:
             res.setdefault(s['path'], (s['name'], None))
-        proj_of = {c['sid']: c.get('cwd') for c in chats.load_index() if not c.get('archived')}
+        proj_of = {c['sid']: c.get('cwd') for c in every}
         for sid, info in self.open_info().items():
             d = proj_of.get(sid)
             if d and info['session']:
@@ -274,7 +284,7 @@ class Agent:
 
     def build_projects(self, git=True):
         every = [c for c in chats.load_index() if not c.get('archived')]
-        return projects.build(every, self.live_by_project(), git=git)
+        return projects.build(every, self.live_by_project(every), git=git)
 
     # -------------------------------------------------------------- pollers
     def poll_sessions(self, force_tmux=False):
@@ -334,12 +344,15 @@ class Agent:
                 self.emit('chats_changed', {'full': list(models.values())})
                 self.projects_dirty = True
                 return
-            ups = [m for cid, m in models.items() if self.chat_models.get(cid) != m]
-            rem = [cid for cid in self.chat_models if cid not in models]
+            prev = self.chat_models
+            ups = [m for cid, m in models.items() if prev.get(cid) != m]
+            rem = [cid for cid in prev if cid not in models]
             self.chat_models = models
             if ups or rem:
                 self.emit('chats_changed', {'upsert': ups, 'remove': rem})
-                self.projects_dirty = True
+                # a running chat grows every few seconds; the project list catches up on its own poll
+                if rem or any(not quiet_change(prev.get(m['id']), m) for m in ups):
+                    self.projects_dirty = True
 
     def poll_projects(self, force=False):
         with self.state:
@@ -348,6 +361,15 @@ class Agent:
                 self.projects = snap
                 self.emit('projects_changed', {'full': snap})
             self.projects_dirty = False
+
+    def poll_busy_git(self):
+        """While Claude works in a project, its git summary («есть изменения») is checked every POLL['busy_git'] s;
+        other projects wait for the project poll and the git cache's TTL (cclib/projects.py)."""
+        with self.state:
+            for pr in self.projects or []:
+                if pr.get('liveStatus') == 'busy' and pr.get('git') is not None:
+                    if projects.git_info_cached(pr['path'], live=True) != pr['git']:
+                        self.projects_dirty = True
 
     def poll_system(self):
         st = system.stats()
@@ -386,6 +408,9 @@ class Agent:
             if t >= self.due['chats']:
                 self.due['chats'] = t + POLL['chats']
                 self.poll_chats()
+            if t >= self.due['busy_git']:
+                self.due['busy_git'] = t + POLL['busy_git']
+                self.poll_busy_git()
             if self.projects_dirty or t >= self.due['projects']:
                 self.due['projects'] = t + POLL['projects']
                 self.poll_projects()
@@ -556,7 +581,7 @@ class Agent:
             raise AgentError('not_found', f'сессии «{name}» нет', {'session': name})
         info = tmux.session_info(name)
         rp = projects.resolve_existing_dir(s['path']) if s['path'] else None
-        git = projects.git_info_cached(rp) if rp else None
+        git = projects.git_info_cached(rp, live=True) if rp else None
         aliases = chats.load_titles()
         claude = []
         for c in s['claude']:
@@ -938,6 +963,7 @@ class Agent:
                 if line.strip():
                     self.handle_line(line.decode('utf-8', 'replace'))
         self.searcher.cancel()
+        chats.flush_index()
         self.askpass.shutdown()     # waiting sudo prompts exit 1: nobody is there to answer them
         self.openurl.shutdown()     # links fall back to the VM's own browser, if it has a desktop
         self.pool.shutdown(wait=True)

@@ -7,6 +7,8 @@ import time
 from . import doctor
 
 _prev_cpu = {'v': None}
+_svc = {'value': None, 'at': 0.0}
+SVC_TTL = 60.0      # the claude-tmux service changes state rarely; stats() runs every 10 s
 
 
 def _run(cmd, timeout=3):
@@ -43,16 +45,30 @@ def cpu_pct():
     return round(100 * (1 - di / dt)) if dt > 0 else 0
 
 
-def mosh_servers():
-    out = _run(['ps', '-u', str(os.getuid()), '-o', 'pid=,etimes=,args='])
+def mosh_servers(proc='/proc'):
+    """[(pid, age in seconds)] of this user's mosh-server processes, read from /proc (no `ps` every 10 s)."""
+    uid = os.getuid()
+    try:
+        with open(os.path.join(proc, 'uptime')) as f:
+            uptime = float(f.read().split()[0])
+        hz = os.sysconf('SC_CLK_TCK')
+        pids = [d for d in os.listdir(proc) if d.isdigit()]
+    except (OSError, ValueError, IndexError):
+        return []
     res = []
-    for line in out.splitlines():
-        f = line.split(None, 2)
-        if len(f) == 3 and f[2].startswith('mosh-server'):
-            try:
-                res.append((int(f[0]), int(f[1])))
-            except ValueError:
-                pass
+    for pid in pids:
+        base = os.path.join(proc, pid)
+        try:
+            if os.stat(base).st_uid != uid:
+                continue
+            with open(os.path.join(base, 'comm')) as f:
+                if f.read().strip() != 'mosh-server':
+                    continue
+            with open(os.path.join(base, 'stat')) as f:
+                start = int(f.read().rsplit(')', 1)[1].split()[19])     # field 22: starttime, in clock ticks
+        except (OSError, ValueError, IndexError):
+            continue
+        res.append((int(pid), max(0, int(uptime - start / hz))))
     return res
 
 
@@ -99,6 +115,15 @@ def top_processes(n=10):
     return res
 
 
+def service_state(now=None):
+    """`systemctl --user is-active claude-tmux.service`, cached for SVC_TTL seconds."""
+    now = time.time() if now is None else now
+    if _svc['value'] is None or now - _svc['at'] >= SVC_TTL:
+        _svc['value'] = _run(['systemctl', '--user', 'is-active', 'claude-tmux.service'], timeout=2).strip() or 'unknown'
+        _svc['at'] = now
+    return _svc['value']
+
+
 def stats(top=False):
     try:
         with open('/proc/loadavg') as f:
@@ -125,7 +150,7 @@ def stats(top=False):
             up = int(float(f.read().split()[0]))
     except (OSError, ValueError):
         up = 0
-    svc = _run(['systemctl', '--user', 'is-active', 'claude-tmux.service'], timeout=2).strip() or 'unknown'
+    svc = service_state()
     res = {
         'load': load, 'cpuPct': cpu_pct(),
         'memPct': round(100 * (1 - mem_avail / mem_total)) if mem_total else 0,

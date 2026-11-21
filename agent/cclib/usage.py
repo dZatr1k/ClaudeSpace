@@ -23,10 +23,21 @@ def _env():
     return env
 
 
+def low_priority():
+    """nice/ionice prefix (whichever is installed): ccusage reads every transcript, hundreds of MB, and must not
+    slow down the chats and terminals running on the VM at the same time."""
+    pre = []
+    if shutil.which('nice'):
+        pre += ['nice', '-n', '10']
+    if shutil.which('ionice'):
+        pre += ['ionice', '-c', '2', '-n', '7']     # best effort, lowest priority (idle class could wait forever)
+    return pre
+
+
 def _run(cmd, timeout=20):
     """stdout of a ccusage call; raises RuntimeError with a short reason if it failed or printed nothing."""
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=_env())
+        r = subprocess.run(low_priority() + cmd, capture_output=True, text=True, timeout=timeout, env=_env())
     except subprocess.TimeoutExpired:
         raise RuntimeError('ccusage не ответил за %d с' % timeout)
     except (OSError, subprocess.SubprocessError) as e:

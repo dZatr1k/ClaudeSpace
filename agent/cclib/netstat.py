@@ -22,12 +22,14 @@ def _addr(hexaddr, v6):
     return '::ffff:' + str(a.ipv4_mapped) if a.ipv4_mapped else str(a)
 
 
-def parse_tcp(text, v6=False):
-    """Rows of /proc/net/tcp(6): [{addr, port, state, uid, inode}] (header skipped, bad rows ignored)."""
+def parse_tcp(text, v6=False, state=None):
+    """Rows of /proc/net/tcp(6): [{addr, port, state, uid, inode}] (header skipped, bad rows ignored).
+    state: keep only rows in this state; the others are skipped before their address is decoded (most rows are
+    connections, and decoding is the slow part)."""
     out = []
     for line in text.splitlines()[1:]:
         f = line.split()
-        if len(f) < 10 or ':' not in f[1]:
+        if len(f) < 10 or ':' not in f[1] or (state is not None and f[3].upper() != state):
             continue
         try:
             hexaddr, hexport = f[1].split(':')
@@ -48,8 +50,8 @@ def _read(path):
 
 def listening(uid=None):
     """LISTEN sockets (IPv4 + IPv6); uid filters to sockets owned by that user."""
-    rows = [r for r in parse_tcp(_read(os.path.join(PROC, 'net', 'tcp'))) if r['state'] == LISTEN]
-    rows += [r for r in parse_tcp(_read(os.path.join(PROC, 'net', 'tcp6')), True) if r['state'] == LISTEN]
+    rows = parse_tcp(_read(os.path.join(PROC, 'net', 'tcp')), state=LISTEN)
+    rows += parse_tcp(_read(os.path.join(PROC, 'net', 'tcp6')), True, state=LISTEN)
     if uid is not None:
         rows = [r for r in rows if r['uid'] == uid]
     return rows

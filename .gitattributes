@@ -1,0 +1,3 @@
+# The agent is installed on the VM by hash (MANIFEST.json). A Windows checkout with core.autocrlf would give its
+# files CRLF and another hash than a Linux build of the same release, and every app would reinstall it.
+agent/** text eol=lf

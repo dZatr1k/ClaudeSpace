@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import time
 
 from . import paths
 
@@ -85,8 +86,14 @@ def display_name(d):
     return os.path.basename(d) if d.startswith(P.projects_root + '/') else paths.short_path(d)
 
 
+def _git(d, *args):
+    """git in d. --no-optional-locks: a status must not take .git/index.lock (and so touch .git) behind the user's
+    back; the agent asks often, and a lock it holds can make the user's own git command fail."""
+    return run(['git', '--no-optional-locks', '-C', d, *args])
+
+
 def git_info(d):
-    out = run(['git', '-C', d, 'status', '--porcelain=v1', '-b'])
+    out = _git(d, 'status', '--porcelain=v1', '-b')
     if not out:
         return None
     lines = out.splitlines()
@@ -96,12 +103,17 @@ def git_info(d):
     return dict(branch=branch, dirty=len(lines) > 1, aheadBehind=ab.group(1) if ab else '')
 
 
-_git_cache = {}   # dir -> (key, info)
+_git_cache = {}   # dir -> (key, info, time)
+# an edit in the working tree changes none of the key's mtimes: it shows when the cached summary expires
+GIT_TTL = 60.0        # no session in the folder
+GIT_TTL_LIVE = 8.0    # a tmux session or Claude runs there (csagent also re-checks a busy Claude's project every 10 s)
 
 
 def _git_key(d):
+    """mtimes of the folder, .git/index and .git/HEAD: a commit, checkout or `git add` asks git again at once.
+    Not .git itself: lock files come and go there, so its mtime changes on every git command, ours included."""
     key = []
-    for p in (d, os.path.join(d, '.git'), os.path.join(d, '.git', 'index'), os.path.join(d, '.git', 'HEAD')):
+    for p in (d, os.path.join(d, '.git', 'index'), os.path.join(d, '.git', 'HEAD')):
         try:
             key.append(os.stat(p).st_mtime)
         except OSError:
@@ -109,16 +121,17 @@ def _git_key(d):
     return tuple(key)
 
 
-def git_info_cached(d, force=False):
+def git_info_cached(d, force=False, live=False, now=None):
     if d == paths.P.home:
         return None
+    now = time.time() if now is None else now
     k = _git_key(d)
     c = _git_cache.get(d)
-    if c and c[0] == k and not force:
+    if c and c[0] == k and not force and now - c[2] < (GIT_TTL_LIVE if live else GIT_TTL):
         return c[1]
-    # no .git folder here: still ask git once (the folder may be inside a repo), then cache by mtime
+    # no .git folder here: still ask git (the folder may be inside a repo)
     info = git_info(d)
-    _git_cache[d] = (k, info)
+    _git_cache[d] = (k, info, now)
     return info
 
 
@@ -127,11 +140,11 @@ def git_details(d):
     if not g:
         return None
     changes = []
-    for line in run(['git', '-C', d, 'status', '--porcelain=v1']).splitlines()[:50]:
+    for line in _git(d, 'status', '--porcelain=v1').splitlines()[:50]:
         if len(line) > 3:
             changes.append({'status': line[:2].strip() or '?', 'file': line[3:]})
     log = []
-    for line in run(['git', '-C', d, 'log', '-8', '--format=%h%x09%ct%x09%s']).splitlines():
+    for line in _git(d, 'log', '-8', '--format=%h%x09%ct%x09%s').splitlines():
         f = line.split('\t', 2)
         if len(f) == 3:
             try:
@@ -162,7 +175,8 @@ def build(chats_raw, live_by_project, git=True):
         live = live_by_project.get(d)
         out.append({
             'path': d, 'name': display_name(d), 'isHome': d == paths.P.home,
-            'git': git_info_cached(d) if git else None, 'lastAt': int(ts * 1000), 'chatCount': nchats.get(d, 0),
+            'git': git_info_cached(d, live=bool(live)) if git else None, 'lastAt': int(ts * 1000),
+            'chatCount': nchats.get(d, 0),
             'liveSession': live[0] if live else None, 'liveStatus': live[1] if live else None,
         })
     return out

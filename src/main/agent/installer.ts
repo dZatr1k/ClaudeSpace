@@ -77,6 +77,8 @@ print('OK')
 export type InstallProgress = (msg: string) => void;
 
 /** a vs b as x.y.z release numbers (a "-suffix" is ignored): <0, 0, >0; null if either is not one. */
+const UPLOAD_PARALLEL = 6;
+
 export function compareVersions(a: string | undefined, b: string | undefined): number | null {
   const parse = (v: string | undefined) => {
     const m = /^(\d+)\.(\d+)\.(\d+)(?:-.*)?$/.exec(v ?? '');
@@ -135,10 +137,21 @@ export async function ensureAgent(
   const mk = await execCollect(t, `mkdir -p -m 700 ~/${tmp}/cclib && chmod 700 ~/${tmp}`);
   if (mk.code !== 0) throw new InstallError('upload', `mkdir: ${mk.stderr.trim()}`);
   try {
-    for (const rel of [...files, 'MANIFEST.json']) {
-      const mode = EXECUTABLE_FILES.includes(rel) ? 0o700 : 0o600;
-      await t.writeFile(`${tmp}/${rel}`, readFileSync(join(bundleDir, rel)), mode);
-    }
+    // a few files in flight at once: one after another, each file costs two round trips (write, chmod)
+    const queue = [...files, 'MANIFEST.json'];
+    let failed: Error | null = null;
+    const worker = async () => {
+      for (let rel = queue.shift(); rel !== undefined && !failed; rel = queue.shift()) {
+        const mode = EXECUTABLE_FILES.includes(rel) ? 0o700 : 0o600;
+        try {
+          await t.writeFile(`${tmp}/${rel}`, readFileSync(join(bundleDir, rel)), mode);
+        } catch (e) {
+          failed ??= e as Error;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: UPLOAD_PARALLEL }, worker));
+    if (failed) throw failed;
   } catch (e) {
     await execCollect(t, `rm -rf ~/${tmp}`).catch(() => undefined);
     throw new InstallError('upload', `загрузка: ${(e as Error).message}`);

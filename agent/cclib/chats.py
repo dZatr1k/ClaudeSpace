@@ -9,6 +9,7 @@ import json
 import os
 import re
 import threading
+import time
 from datetime import datetime
 
 from . import paths
@@ -18,8 +19,9 @@ INDEX_VERSION = 3          # same layout as ccdata INDEX_VERSION 3 (+ extra keys
 HEAD_BYTES = 1 << 20
 TAIL_BYTES = 1 << 20
 NOISE = re.compile(r'^(<|Caveat:|\[Request interrupted)')
+WRITE_EVERY = 45.0         # the index file is a cache for the next start: a running chat changes it every few seconds
 _lock = threading.RLock()
-_mem = {'chats': None}      # in-memory index between polls (agent is long-lived)
+_mem = {'chats': None, 'dirty': False, 'written': 0.0}   # in-memory index between polls (agent is long-lived)
 
 
 def parse_ts(s):
@@ -176,18 +178,30 @@ def load_index():
                 changed = True
         for p, c in new.items():
             c['archived'] = p.startswith(P.archive_dir + os.sep)
-        if changed or len(new) != len(old):
-            try:
-                paths.atomic_write_json(P.index, {'v': INDEX_VERSION, 'chats': new})
-            except OSError:
-                pass
         _mem['chats'] = new
+        if changed or len(new) != len(old):
+            _mem['dirty'] = True
+        if _mem['dirty'] and time.time() - _mem['written'] >= WRITE_EVERY:
+            flush_index()
         return list(new.values())
+
+
+def flush_index():
+    """Write the in-memory index to disk if it changed since the last write (load_index does it at most every
+    WRITE_EVERY seconds; the agent calls this on exit)."""
+    with _lock:
+        if not _mem['dirty'] or _mem['chats'] is None:
+            return
+        _mem['dirty'], _mem['written'] = False, time.time()
+        try:
+            paths.atomic_write_json(paths.P.index, {'v': INDEX_VERSION, 'chats': _mem['chats']})
+        except OSError:
+            pass
 
 
 def reset_memory():
     with _lock:
-        _mem['chats'] = None
+        _mem.update(chats=None, dirty=False, written=0.0)
 
 
 def visible(chats):

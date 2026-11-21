@@ -31,12 +31,16 @@ export interface TermHandle {
   ackTimer: number | null;
   received: number;
   webgl: WebglAddon | null;
+  /** the WebGL canvas keeps its drawing buffer so that the live check can read it back (until that check ran) */
+  webglPreserve: boolean;
   /** attached to a tmux session: its status line can be cut off (settings.terminal.hideTmuxStatus) */
   tmux: boolean;
 }
 
 const handles = new Map<string, TermHandle>();
-const ACK_BATCH = 64 * 1024;
+// main pauses a channel above 1 MB unacked and resumes below 256 KB (terminals.ts): a batch must stay well under that
+const ACK_BATCH = 128 * 1024;
+const ACK_DELAY = 250;
 
 export function getHandle(tabId: string): TermHandle | undefined {
   return handles.get(tabId);
@@ -99,6 +103,7 @@ export function createHandle(tab: Tab): TermHandle {
     opened: false,
     ackBytes: 0,
     ackTimer: null,
+    webglPreserve: false,
     received: 0,
     webgl: null,
     tmux: tab.kind === 'tmux',
@@ -185,7 +190,9 @@ function scheduleLiveCheck(h: TermHandle): void {
   let tries = 0;
   const run = () => {
     if (liveChecked || !h.webgl || !h.host) return;
-    const r = h.host.clientWidth > 50 ? checkLive(h.term, h.host) : null;
+    // a background tab keeps its size but is not drawn (TerminalView moves it off screen): nothing to read there
+    const shown = h.host.clientWidth > 50 && getComputedStyle(h.host).visibility === 'visible';
+    const r = shown ? checkLive(h.term, h.host) : null;
     if (!r || (r.ratio === null && ++tries < 10)) {
       window.setTimeout(run, 3000); // hidden tab or nothing on screen yet
       return;
@@ -193,6 +200,7 @@ function scheduleLiveCheck(h: TermHandle): void {
     liveChecked = true;
     void invoke('diag.log', { text: `[webgl-live] ${JSON.stringify(r).slice(0, 4000)}` });
     if (!r.ok) webglFailed(r);
+    else for (const x of handles.values()) syncRenderer(x); // drop preserveDrawingBuffer: nobody reads it now
   };
   window.setTimeout(run, 1500);
 }
@@ -201,19 +209,23 @@ function scheduleLiveCheck(h: TermHandle): void {
  * after the probe passed; until then (and if it fails) the DOM renderer draws. */
 function syncRenderer(h: TermHandle): void {
   const want = (settings()?.terminal.renderer ?? 'webgl') === 'webgl' && webglChecked();
-  if (!want && h.webgl) {
+  // preserveDrawingBuffer costs a copy of the canvas on every frame; only the live check needs it
+  const preserve = !liveChecked && !probeOverridable;
+  if (h.webgl && (!want || (h.webglPreserve && !preserve))) {
     h.webgl.dispose();
     h.webgl = null;
-  } else if (want && !h.webgl && h.opened) {
+  }
+  if (want && !h.webgl && h.opened) {
     try {
-      const gl = new WebglAddon(true); // preserveDrawingBuffer: the live check reads the canvas back
+      const gl = new WebglAddon(preserve);
       gl.onContextLoss(() => {
         gl.dispose();
-        h.webgl = null;
+        if (h.webgl === gl) h.webgl = null;
       });
       h.term.loadAddon(gl);
       h.webgl = gl;
-      scheduleLiveCheck(h);
+      h.webglPreserve = preserve;
+      if (preserve) scheduleLiveCheck(h);
     } catch {
       h.webgl = null; // DOM renderer fallback
     }
@@ -376,7 +388,7 @@ function ack(h: TermHandle, n: number) {
       h.ackTimer = null;
       if (h.ackBytes) void invoke('term.ack', { tabId: h.tabId, bytes: h.ackBytes });
       h.ackBytes = 0;
-    }, 30);
+    }, ACK_DELAY);
   }
 }
 

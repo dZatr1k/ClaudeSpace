@@ -334,7 +334,9 @@ export function TerminalView({
               width: `${pane.rect.width}%`,
               height: `${pane.rect.height}%`,
             }
-          : { inset: 0 }
+          : // a background tab keeps its size (no refit, tmux sees no resize) but lies outside the window: xterm
+            // pauses drawing for an element that does not intersect the viewport, visibility alone does not count
+            { inset: 0, transform: 'translateX(-200vw)' }
       }
       data-pane={pane?.index}
       onMouseDownCapture={() => {

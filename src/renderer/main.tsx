@@ -134,19 +134,28 @@ async function init() {
     }
   });
 
-  // usage for the status bar: on connect and every 5 minutes (agent caches ccusage for 60 s)
-  const refreshUsage = () => {
+  // usage for the status bar: on connect and every 5 minutes while the window is shown. ccusage reads every
+  // transcript on the VM (hundreds of MB), so a reconnect takes the agent's cached result if it is under 5 minutes
+  // old, and a hidden window (tray, minimized) asks nothing until it is shown again.
+  const USAGE_EVERY = 5 * 60_000;
+  const refreshUsage = (maxAge?: number) => {
     if (useConn.getState().state.kind !== 'online') return;
-    agent('usage', {}).then(
+    agent('usage', maxAge === undefined ? {} : { maxAge }).then(
       (u) => useData.getState().setUsage(u),
       () => undefined,
     );
   };
+  const usageStale = () => Date.now() - (useData.getState().usage?.at ?? 0) >= USAGE_EVERY;
   useConn.subscribe((c, p) => {
-    if (c.state.kind === 'online' && p.state.kind !== 'online') refreshUsage();
+    if (c.state.kind === 'online' && p.state.kind !== 'online') refreshUsage(USAGE_EVERY / 1000);
   });
-  refreshUsage();
-  setInterval(refreshUsage, 5 * 60_000);
+  refreshUsage(USAGE_EVERY / 1000);
+  setInterval(() => {
+    if (!document.hidden) refreshUsage();
+  }, USAGE_EVERY);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && usageStale()) refreshUsage();
+  });
 
   // persist workspace (debounced in main)
   const save = () => {

@@ -1,9 +1,11 @@
 /// <reference lib="dom" />
 // BACKLOG 6 with a real WebGL renderer: SwiftShader (software GPU) gives Electron WebGL2 without a GPU. Run with
 //   E2E_GL=1 DISPLAY=:10 npx playwright test tests/e2e/webgl.spec.ts
+// Also checks that a background tab is not drawn (docs/PERF.md, item 1).
 // Skipped otherwise (CI has no WebGL; the smoke test then runs on the DOM renderer).
 import { _electron as electron, expect, test } from '@playwright/test';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ROOT, TMUX_SOCKET, ensureBundle, killTmux, makeFakeHome } from '../integration/helpers';
@@ -54,6 +56,41 @@ test('WebGL glyphs are drawn at full size and the terminal keeps WebGL', async (
     console.warn('webgl-live', log(/\[webgl-live\] (.*)/)());
     await expect(win.locator('.xterm-screen canvas').first()).toBeVisible();
     await win.screenshot({ path: join(ROOT, 'test-results', 'webgl.png') });
+
+    // a background tab is not drawn (docs/PERF.md, item 1): count WebGL draw calls per terminal while both get output
+    await win.getByTestId('project-Beta').dblclick();
+    await expect(win.locator('[data-terminal][data-term-state="live"]')).toHaveCount(2, { timeout: 15_000 });
+    await win.evaluate(() => {
+      const draws: Record<string, number> = {};
+      (window as unknown as { draws: Record<string, number> }).draws = draws;
+      const proto = WebGL2RenderingContext.prototype as unknown as Record<
+        string,
+        (...a: unknown[]) => unknown
+      >;
+      for (const name of ['drawElementsInstanced', 'drawArraysInstanced', 'drawElements', 'drawArrays']) {
+        const orig = proto[name]!;
+        proto[name] = function (this: WebGL2RenderingContext, ...a: unknown[]) {
+          const host = (this.canvas as HTMLCanvasElement).closest('[data-terminal]');
+          const key = host ? (host.hasAttribute('data-pane') ? 'shown' : 'background') : 'other';
+          draws[key] = (draws[key] ?? 0) + 1;
+          return orig.apply(this, a);
+        };
+      }
+    });
+    const ttys = execFileSync('tmux', ['-L', TMUX_SOCKET, 'list-panes', '-a', '-F', '#{pane_tty}'], {
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(Boolean);
+    expect(ttys).toHaveLength(2);
+    for (let i = 0; i < 20; i++) {
+      for (const tty of ttys) appendFileSync(tty, `line ${i}\r\n`);
+      await win.waitForTimeout(100);
+    }
+    const draws = await win.evaluate(() => (window as unknown as { draws: Record<string, number> }).draws);
+    console.warn('draws', JSON.stringify(draws));
+    expect(draws.shown ?? 0).toBeGreaterThan(5);
+    expect(draws.background ?? 0).toBe(0);
   } finally {
     await app.close();
   }

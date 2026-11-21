@@ -324,7 +324,9 @@ function SessionInfo({ name }: { name: string }) {
     primary?.chatId,
     primary?.status,
     primary?.statusAt,
-    liveChat?.lastAt,
+    // the chat grows every few seconds while Claude works; its last prompt and context are refreshed at most every
+    // 15 s (a change of status reloads at once)
+    Math.floor((liveChat?.lastAt ?? 0) / 15_000),
     s?.attached,
     s?.path,
     s?.windows,

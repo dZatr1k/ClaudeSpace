@@ -11,6 +11,32 @@
 - A link clicked right after the app connects is no longer lost: the agent listens for links before it sends the
   first lists.
 
+Performance (findings and measurements in `docs/PERF.md`):
+- Background terminal tabs are no longer drawn. They were hidden with `visibility: hidden`, which xterm does not
+  count as off screen, so each one redrew as often as the visible tab and kept the GPU process busy. Now they sit
+  outside the window, and xterm pauses them. The WebGL canvas keeps its drawing buffer only until the one-off glyph
+  size check has run.
+- The agent runs git far less often. `git status` created `.git/index.lock`, which changed the mtime of `.git`, and
+  the git cache used that mtime as its key: every poll ran git again, up to 128 times a minute while Claude worked.
+  Now git runs with `--no-optional-locks`, the cached summary expires after 8 s for a folder with a session and
+  after a minute for the rest, and the project where Claude is busy is checked every 10 s. A chat that only grows
+  no longer rebuilds the project list.
+- ccusage reads every transcript on the VM on each run. It now runs under `nice` and `ionice`, the status bar does
+  not refresh usage while the window is hidden, and a reconnect takes the agent's result if it is under 5 minutes
+  old.
+- The chat index (`~/.cache/claudespace/chats.json`) is written at most every 45 s and when the agent exits, not
+  after every change of a running chat.
+- The agent is no longer reinstalled at every connection after a release. The release is built on Windows, where
+  the checkout gave the agent CRLF line endings, so its hash differed from Linux builds of the same version.
+  `.gitattributes` keeps `agent/` in LF. The install uploads up to 6 files at a time instead of one by one.
+- Smaller polls: one tmux call instead of two, the `claude-tmux` service state cached for a minute, mosh servers
+  found in `/proc` instead of `ps`, and rows of `/proc/net/tcp` that are not listening skipped before decoding.
+- The «Сведения» panel of a session reloads at most every 15 s while Claude writes, not on every new line of the
+  transcript.
+- The notification sound's audio context is suspended 1.5 s after the sound ends.
+- Terminal output after a quiet spell, such as the echo of a key, goes to the window at once instead of after 8 ms;
+  bursts are still batched. The window acknowledges output every 128 KB or 250 ms instead of 64 KB or 30 ms.
+
 ## 0.7.10
 - A link clicked in a Claude Code chat opens in the PC's browser, and Claude Code no longer says «Couldn't open your
   browser». Chats started by ClaudeSpace get `BROWSER` set to the agent's `openurl.py`; the script hands the link to

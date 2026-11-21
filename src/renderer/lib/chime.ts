@@ -1,15 +1,31 @@
 // Short two-note chime generated with WebAudio: no binary asset, no network (CSP stays default-src 'self').
 import { invoke } from '../bridge';
 let ctx: AudioContext | null = null;
+let sleepTimer: number | null = null;
 
 function audio(): AudioContext | null {
   try {
     ctx ??= new AudioContext();
+    if (sleepTimer !== null) window.clearTimeout(sleepTimer);
+    sleepTimer = null;
     if (ctx.state === 'suspended') void ctx.resume();
     return ctx;
   } catch {
     return null;
   }
+}
+
+/** A running AudioContext keeps the audio service busy (and its output stream open) in silence. Suspend it shortly
+ * after the sound ends; audio() resumes it for the next one. */
+function sleepAfter(seconds: number): void {
+  if (sleepTimer !== null) window.clearTimeout(sleepTimer);
+  sleepTimer = window.setTimeout(
+    () => {
+      sleepTimer = null;
+      if (ctx?.state === 'running') void ctx.suspend();
+    },
+    (seconds + 1.5) * 1000,
+  );
 }
 
 function note(ac: AudioContext, out: AudioNode, freq: number, at: number, dur: number, gain: number) {
@@ -45,6 +61,7 @@ export function playChime(volume: number, kind: 'waiting' | 'idle' = 'waiting'):
   note(ac, master, a, t0, 0.35, 1);
   note(ac, master, b, t0 + 0.13, 0.6, 0.9);
   setTimeout(() => master.disconnect(), 1200);
+  sleepAfter(1.2);
 }
 
 // ---- the user's own sound file (from the PC, read by main; decoded here) --------------------------------------
@@ -93,5 +110,6 @@ export async function playNotifySound(
   src.buffer = buf;
   src.connect(gain).connect(ac.destination);
   src.start();
+  sleepAfter(buf.duration);
   return 'file';
 }
